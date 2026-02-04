@@ -255,3 +255,11 @@ Set it up.
 ---
 
 Let's put the new framework to the test. Let's create a last_eval_into field for subscription, default to NOW(). Also add server_id field.
+
+---
+
+Let's migrate to add game_id to eval, I want to be able to track if I already evaluated this game for this subscription
+
+---
+
+Edit the @README.md with the new technical details. Especially update the setup guide so that users are easily able to bootstrap the bot and get it going locally, such as postgres, atlas, which tokens to get and links to get them, etc.
