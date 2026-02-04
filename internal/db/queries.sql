@@ -8,6 +8,11 @@ RETURNING *;
 SELECT * FROM subscriptions
 ORDER BY created_at DESC;
 
+-- name: GetSubscriptionsByChannel :many
+SELECT * FROM subscriptions
+WHERE discord_channel_id = $1
+ORDER BY created_at DESC;
+
 -- name: GetSubscriptionByID :one
 SELECT * FROM subscriptions
 WHERE id = $1;

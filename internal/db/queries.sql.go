@@ -205,6 +205,37 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id int64) (Subscripti
 	return i, err
 }
 
+const getSubscriptionsByChannel = `-- name: GetSubscriptionsByChannel :many
+SELECT id, discord_channel_id, lol_username, created_at FROM subscriptions
+WHERE discord_channel_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetSubscriptionsByChannel(ctx context.Context, discordChannelID string) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, getSubscriptionsByChannel, discordChannelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Subscription{}
+	for rows.Next() {
+		var i Subscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.DiscordChannelID,
+			&i.LolUsername,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTranslation = `-- name: GetTranslation :one
 SELECT id, username, translation, created_at FROM translations
 WHERE username = $1
