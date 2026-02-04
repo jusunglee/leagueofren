@@ -61,3 +61,34 @@ WHERE tte.eval_id = $1;
 INSERT INTO feedback (discord_message_id, feedback_text)
 VALUES ($1, $2)
 RETURNING *;
+
+-- Account cache queries
+-- name: GetCachedAccount :one
+SELECT game_name, tag_line, region, puuid
+FROM riot_account_cache
+WHERE game_name = $1 AND tag_line = $2 AND region = $3 AND expires_at > NOW();
+
+-- name: CacheAccount :exec
+INSERT INTO riot_account_cache (game_name, tag_line, region, puuid, expires_at)
+VALUES ($1, $2, $3, $4, NOW() + interval '24 hours')
+ON CONFLICT (game_name, tag_line, region)
+DO UPDATE SET puuid = $4, cached_at = NOW(), expires_at = NOW() + interval '24 hours';
+
+-- Game cache queries
+-- name: GetCachedGameStatus :one
+SELECT puuid, region, in_game, game_id, participants
+FROM riot_game_cache
+WHERE puuid = $1 AND region = $2 AND expires_at > NOW();
+
+-- name: CacheGameStatus :exec
+INSERT INTO riot_game_cache (puuid, region, in_game, game_id, participants, expires_at)
+VALUES ($1, $2, $3, $4, $5, NOW() + interval '2 minutes')
+ON CONFLICT (puuid, region)
+DO UPDATE SET in_game = $3, game_id = $4, participants = $5, cached_at = NOW(), expires_at = NOW() + interval '2 minutes';
+
+-- Cleanup queries
+-- name: DeleteExpiredAccountCache :exec
+DELETE FROM riot_account_cache WHERE expires_at < NOW();
+
+-- name: DeleteExpiredGameCache :exec
+DELETE FROM riot_game_cache WHERE expires_at < NOW();

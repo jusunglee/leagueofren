@@ -18,7 +18,7 @@ import (
 
 type Bot struct {
 	queries    *db.Queries
-	riotClient *riot.Client
+	riotClient *riot.CachedClient
 }
 
 func buildRegionChoices() []*discordgo.ApplicationCommandOptionChoice {
@@ -110,11 +110,12 @@ func main() {
 	defer pool.Close()
 	slog.Info("connected to database")
 
+	queries := db.New(pool)
 	bot := &Bot{
-		queries:    db.New(pool),
-		riotClient: riot.NewClient(riotAPIKey),
+		queries:    queries,
+		riotClient: riot.NewCachedClient(riotAPIKey, queries),
 	}
-	slog.Info("riot API client initialized")
+	slog.Info("riot API client initialized with caching")
 
 	dg, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
@@ -241,7 +242,7 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 		}
 	}
 
-	account, err := b.riotClient.GetAccountByRiotID(gameName, tagLine, region)
+	account, err := b.riotClient.GetAccountByRiotID(context.Background(), gameName, tagLine, region)
 	if errors.Is(err, riot.ErrNotFound) {
 		return HandlerResult{
 			Response: fmt.Sprintf("❌ Summoner **%s#%s** not found in **%s**", gameName, tagLine, region),

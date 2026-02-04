@@ -191,3 +191,43 @@ Let's force using the specific type that the internal lib has for the model name
 ---
 
 Change the githook so that we auto gofmt commits and stage the changes instead of merely failing when a file is not formatted.
+
+---
+
+Is there a reason to keep @cmd/bot/CLAUDE.md in that nested directory or can we move it top level?
+
+---
+
+Let's move it
+
+---
+
+Let's implement a caching layer for our riot API so that if we ask for the sammer summoner, we get the same memoized response. Is the right layer for this in the http client, or totally separate? I'm more interested in respecting API limits than I am in making calls fast. Is Redis as a platform choice overkill here? One situation I def want to avoid is using an in-memory cache and then just losing everything when I save code changes + restart, if there's a very minimal/simple on-disk caching go module we can use I wouldn't be opposed to that for local, but obviously this is not scalable for production.
+
+---
+
+okay let's roll with postgres, I agree that it's simpler to leverage existing technologies for now
+
+---
+
+I don't understand, the information we want to cache specifically comes down to 2 queries: 1. seeing if a summoner exists, and 2. seeing who is in their games for the last 2 minutes. I don't think your proposed model handles these cases and instead serves as a generic account/game cache
+
+---
+
+Both endpoints now (design cache schema for account lookups AND game/spectator data upfront)
+
+---
+
+we should return wrapped errors if they're returned from teh queries, instead of just ignoring underscored assignments. Sure it's unlikely but I'd rather not have invisible breakages
+
+---
+
+why return a pointer to Account and Game?
+
+---
+
+Let's change them to return values instead. Be consistent
+
+---
+
+Don't export the non cached client, only export the cached client. This may mean we will need to move some of the constructor logic over to cached but I don't want developers to be confused and accidentally use the non-cached client.

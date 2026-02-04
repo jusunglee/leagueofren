@@ -23,6 +23,27 @@ type Feedback struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type RiotAccountCache struct {
+	ID        int64              `json:"id"`
+	GameName  string             `json:"game_name"`
+	TagLine   string             `json:"tag_line"`
+	Region    string             `json:"region"`
+	Puuid     string             `json:"puuid"`
+	CachedAt  pgtype.Timestamptz `json:"cached_at"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+type RiotGameCache struct {
+	ID           int64              `json:"id"`
+	Puuid        string             `json:"puuid"`
+	Region       string             `json:"region"`
+	InGame       bool               `json:"in_game"`
+	GameID       pgtype.Text        `json:"game_id"`
+	Participants []byte             `json:"participants"`
+	CachedAt     pgtype.Timestamptz `json:"cached_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+}
+
 type Subscription struct {
 	ID               int64              `json:"id"`
 	DiscordChannelID string             `json:"discord_channel_id"`

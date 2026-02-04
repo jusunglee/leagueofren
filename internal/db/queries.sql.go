@@ -11,6 +11,56 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cacheAccount = `-- name: CacheAccount :exec
+INSERT INTO riot_account_cache (game_name, tag_line, region, puuid, expires_at)
+VALUES ($1, $2, $3, $4, NOW() + interval '24 hours')
+ON CONFLICT (game_name, tag_line, region)
+DO UPDATE SET puuid = $4, cached_at = NOW(), expires_at = NOW() + interval '24 hours'
+`
+
+type CacheAccountParams struct {
+	GameName string `json:"game_name"`
+	TagLine  string `json:"tag_line"`
+	Region   string `json:"region"`
+	Puuid    string `json:"puuid"`
+}
+
+func (q *Queries) CacheAccount(ctx context.Context, arg CacheAccountParams) error {
+	_, err := q.db.Exec(ctx, cacheAccount,
+		arg.GameName,
+		arg.TagLine,
+		arg.Region,
+		arg.Puuid,
+	)
+	return err
+}
+
+const cacheGameStatus = `-- name: CacheGameStatus :exec
+INSERT INTO riot_game_cache (puuid, region, in_game, game_id, participants, expires_at)
+VALUES ($1, $2, $3, $4, $5, NOW() + interval '2 minutes')
+ON CONFLICT (puuid, region)
+DO UPDATE SET in_game = $3, game_id = $4, participants = $5, cached_at = NOW(), expires_at = NOW() + interval '2 minutes'
+`
+
+type CacheGameStatusParams struct {
+	Puuid        string      `json:"puuid"`
+	Region       string      `json:"region"`
+	InGame       bool        `json:"in_game"`
+	GameID       pgtype.Text `json:"game_id"`
+	Participants []byte      `json:"participants"`
+}
+
+func (q *Queries) CacheGameStatus(ctx context.Context, arg CacheGameStatusParams) error {
+	_, err := q.db.Exec(ctx, cacheGameStatus,
+		arg.Puuid,
+		arg.Region,
+		arg.InGame,
+		arg.GameID,
+		arg.Participants,
+	)
+	return err
+}
+
 const createEval = `-- name: CreateEval :one
 INSERT INTO evals (subscription_id, eval_status, discord_message_id)
 VALUES ($1, $2, $3)
@@ -125,6 +175,25 @@ func (q *Queries) CreateTranslationToEval(ctx context.Context, arg CreateTransla
 	return err
 }
 
+const deleteExpiredAccountCache = `-- name: DeleteExpiredAccountCache :exec
+DELETE FROM riot_account_cache WHERE expires_at < NOW()
+`
+
+// Cleanup queries
+func (q *Queries) DeleteExpiredAccountCache(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredAccountCache)
+	return err
+}
+
+const deleteExpiredGameCache = `-- name: DeleteExpiredGameCache :exec
+DELETE FROM riot_game_cache WHERE expires_at < NOW()
+`
+
+func (q *Queries) DeleteExpiredGameCache(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredGameCache)
+	return err
+}
+
 const deleteSubscription = `-- name: DeleteSubscription :execrows
 DELETE FROM subscriptions
 WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3
@@ -173,6 +242,71 @@ func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]Subscription, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const getCachedAccount = `-- name: GetCachedAccount :one
+SELECT game_name, tag_line, region, puuid
+FROM riot_account_cache
+WHERE game_name = $1 AND tag_line = $2 AND region = $3 AND expires_at > NOW()
+`
+
+type GetCachedAccountParams struct {
+	GameName string `json:"game_name"`
+	TagLine  string `json:"tag_line"`
+	Region   string `json:"region"`
+}
+
+type GetCachedAccountRow struct {
+	GameName string `json:"game_name"`
+	TagLine  string `json:"tag_line"`
+	Region   string `json:"region"`
+	Puuid    string `json:"puuid"`
+}
+
+// Account cache queries
+func (q *Queries) GetCachedAccount(ctx context.Context, arg GetCachedAccountParams) (GetCachedAccountRow, error) {
+	row := q.db.QueryRow(ctx, getCachedAccount, arg.GameName, arg.TagLine, arg.Region)
+	var i GetCachedAccountRow
+	err := row.Scan(
+		&i.GameName,
+		&i.TagLine,
+		&i.Region,
+		&i.Puuid,
+	)
+	return i, err
+}
+
+const getCachedGameStatus = `-- name: GetCachedGameStatus :one
+SELECT puuid, region, in_game, game_id, participants
+FROM riot_game_cache
+WHERE puuid = $1 AND region = $2 AND expires_at > NOW()
+`
+
+type GetCachedGameStatusParams struct {
+	Puuid  string `json:"puuid"`
+	Region string `json:"region"`
+}
+
+type GetCachedGameStatusRow struct {
+	Puuid        string      `json:"puuid"`
+	Region       string      `json:"region"`
+	InGame       bool        `json:"in_game"`
+	GameID       pgtype.Text `json:"game_id"`
+	Participants []byte      `json:"participants"`
+}
+
+// Game cache queries
+func (q *Queries) GetCachedGameStatus(ctx context.Context, arg GetCachedGameStatusParams) (GetCachedGameStatusRow, error) {
+	row := q.db.QueryRow(ctx, getCachedGameStatus, arg.Puuid, arg.Region)
+	var i GetCachedGameStatusRow
+	err := row.Scan(
+		&i.Puuid,
+		&i.Region,
+		&i.InGame,
+		&i.GameID,
+		&i.Participants,
+	)
+	return i, err
 }
 
 const getLatestEvalForSubscription = `-- name: GetLatestEvalForSubscription :one
