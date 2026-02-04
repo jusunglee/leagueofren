@@ -107,3 +107,31 @@ Let's use air and create a make watch for it
 ---
 
 In create, verify that the subscription doesnt already exist. for delete, verify that the subscription does exist. send a message accordingly if either case is triggered.
+
+---
+
+Restructure the handlers to always return a wrapped error, and the handleInteraction is the layer that logs the error. We should leave the respond commands where they are though
+
+---
+
+Okay I have a better idea I think. Let's create a class of errors called "UserErrors", which takes in a respondMessage as a param. when the top level handler encounters this class of errors, we will send the respondMessage param and also warn log if in development mode. If not that class of errors, let's respond with a generic "Error sending command, please try again later." and error log.
+
+---
+
+doesn't go 1.26 have a cleaner way to handle error type matching? Read the release notes to validate
+
+---
+
+This is a step in the right direction, is there a better way we can leverage NewUserError to not "lose fidelity" , for example for ParseRiotID we store an error but don't actutally propagate it into NewUserError. Is it possible to store that error chain as one field (error) and then the message we want to send as a separate field?
+
+---
+
+Okay I changed my mind. I think I like the error handling cleanliness but it still feels weird to imperatively send respond for successful messages as well within the handler function. Let's change the return signature of these handlers to a simple struct with an error field and a respond field. We always send the respond field (should not be empty, all actions lead to a response) and we error log if non user error, for user error type we only warn log if we're in development mode.
+
+---
+
+Create a precommit hook to gofmt + compile
+
+---
+
+I'm pretty sure there's a way to track git pre commit hooks for a repo.

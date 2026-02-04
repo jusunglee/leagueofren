@@ -20,7 +20,7 @@ The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean a
 
 ## Tech Stack
 
-- **Language**: Go 1.26rc2
+- **Language**: Go 1.26rc2, will change this to non-rc later this month when it's released
 - **Database**: PostgreSQL 16
 - **Discord**: WebSocket Gateway (discordgo)
 - **APIs**: Riot Games API, Anthropic API
@@ -58,17 +58,20 @@ Discord Bot Process
 ### Local Development
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/jusunglee/leagueofren.git
 cd leagueofren
 ```
 
 2. **Start PostgreSQL**
+
 ```bash
 make db-up
 ```
 
 3. **Set up environment variables**
+
 ```bash
 cp .env.example .env
 # Edit .env and add your API keys:
@@ -78,12 +81,14 @@ cp .env.example .env
 ```
 
 4. **Run database migrations**
+
 ```bash
 # Apply migrations directly (migrate CLI has issues with our setup)
 docker exec -i leagueofren-db psql -U leagueofren -d leagueofren < migrations/000001_initial_schema.up.sql
 ```
 
 5. **Run the bot**
+
 ```bash
 make run
 ```
@@ -105,16 +110,19 @@ make clean          # Clean build artifacts
 ### Railway Deployment
 
 1. **Create Railway project**
+
 ```bash
 railway init
 ```
 
 2. **Add PostgreSQL**
+
 ```bash
 railway add postgresql
 ```
 
 3. **Set environment variables**
+
 ```bash
 railway variables set DISCORD_TOKEN=your_token
 railway variables set RIOT_API_KEY=your_key
@@ -122,11 +130,13 @@ railway variables set ANTHROPIC_API_KEY=your_key
 ```
 
 4. **Deploy**
+
 ```bash
 git push railway main
 ```
 
 Railway will automatically:
+
 - Detect the Dockerfile
 - Build the multi-stage image
 - Inject DATABASE_URL
@@ -205,13 +215,6 @@ MIT License - see [LICENSE](LICENSE) for details
 - Discord for the Gateway API
 - Anthropic for Claude Haiku translation capabilities
 
-## Roadmap
+## Responsible AI Disclosure
 
-- [ ] Implement Discord bot commands
-- [ ] Implement Riot API client with rate limiting
-- [ ] Implement translation service
-- [ ] Implement polling loop
-- [ ] Add Chinese character support (currently planned for Korean first)
-- [ ] Add feedback mechanism for translation quality
-- [ ] Add admin commands for managing subscriptions
-- [ ] Optimize polling frequency based on player activity
+I leaned on Claude quite heavily here. You can see my entire prompt history in [claude_history.txt](claude_history.txt). I have never enabled allow all edits, I review every suggestion which is hopefully evident by the response history. I also welcome meta commentary on my prompt usage, always open to feedback on this front.

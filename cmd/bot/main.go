@@ -158,19 +158,57 @@ func main() {
 	slog.Info("shutting down")
 }
 
+type HandlerResult struct {
+	Response string
+	Err      error
+}
+
 func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type != discordgo.InteractionApplicationCommand {
 		return
 	}
 
-	switch i.ApplicationCommandData().Name {
+	var result HandlerResult
+	cmd := i.ApplicationCommandData().Name
+
+	switch cmd {
 	case "subscribe":
-		b.handleSubscribe(s, i)
+		result = b.handleSubscribe(i)
 	case "unsubscribe":
-		b.handleUnsubscribe(s, i)
+		result = b.handleUnsubscribe(i)
 	case "list":
-		b.handleListForChannel(s, i)
+		result = b.handleListForChannel(i)
 	}
+
+	respond(s, i, result.Response)
+
+	if result.Err == nil {
+		return
+	}
+
+	if _, ok := errors.AsType[*UserError](result.Err); ok {
+		if os.Getenv("DISCORD_GUILD_ID") != "" {
+			slog.Warn("user error", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
+		}
+	} else {
+		slog.Error("command failed", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
+	}
+}
+
+type UserError struct {
+	Err error
+}
+
+func (e *UserError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *UserError) Unwrap() error {
+	return e.Err
+}
+
+func NewUserError(err error) *UserError {
+	return &UserError{Err: err}
 }
 
 func getOption(options []*discordgo.ApplicationCommandInteractionDataOption, name string) string {
@@ -182,7 +220,7 @@ func getOption(options []*discordgo.ApplicationCommandInteractionDataOption, nam
 	return ""
 }
 
-func (b *Bot) handleSubscribe(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 	options := i.ApplicationCommandData().Options
 	username := getOption(options, "username")
 	region := getOption(options, "region")
@@ -190,24 +228,31 @@ func (b *Bot) handleSubscribe(s *discordgo.Session, i *discordgo.InteractionCrea
 
 	gameName, tagLine, err := riot.ParseRiotID(username)
 	if err != nil {
-		respond(s, i, "❌ Invalid Riot ID format. Use `name#tag` (e.g., `Faker#KR1`)")
-		return
+		return HandlerResult{
+			Response: "❌ Invalid Riot ID format. Use `name#tag` (e.g., `Faker#KR1`)",
+			Err:      NewUserError(err),
+		}
 	}
 
 	if !riot.IsValidRegion(region) {
-		respond(s, i, fmt.Sprintf("❌ Invalid region: %s", region))
-		return
+		return HandlerResult{
+			Response: fmt.Sprintf("❌ Invalid region: %s", region),
+			Err:      NewUserError(fmt.Errorf("invalid region: %s", region)),
+		}
 	}
 
 	account, err := b.riotClient.GetAccountByRiotID(gameName, tagLine, region)
 	if errors.Is(err, riot.ErrNotFound) {
-		respond(s, i, fmt.Sprintf("❌ Summoner **%s#%s** not found in **%s**", gameName, tagLine, region))
-		return
+		return HandlerResult{
+			Response: fmt.Sprintf("❌ Summoner **%s#%s** not found in **%s**", gameName, tagLine, region),
+			Err:      NewUserError(err),
+		}
 	}
 	if err != nil {
-		slog.Error("failed to verify summoner", "error", err, "username", username, "region", region)
-		respond(s, i, "❌ Failed to verify summoner. Please try again later.")
-		return
+		return HandlerResult{
+			Response: "❌ Failed to verify summoner. Please try again later.",
+			Err:      fmt.Errorf("verify summoner %s in %s: %w", username, region, err),
+		}
 	}
 
 	canonicalName := fmt.Sprintf("%s#%s", account.GameName, account.TagLine)
@@ -218,20 +263,23 @@ func (b *Bot) handleSubscribe(s *discordgo.Session, i *discordgo.InteractionCrea
 		Region:           region,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		respond(s, i, fmt.Sprintf("⚠️ Already subscribed to **%s** (%s)", canonicalName, region))
-		return
+		return HandlerResult{
+			Response: fmt.Sprintf("⚠️ Already subscribed to **%s** (%s)", canonicalName, region),
+			Err:      NewUserError(err),
+		}
 	}
 	if err != nil {
-		slog.Error("failed to create subscription", "error", err, "username", canonicalName, "region", region, "channel_id", channelID)
-		respond(s, i, "❌ Failed to subscribe. Please try again later.")
-		return
+		return HandlerResult{
+			Response: "❌ Failed to subscribe. Please try again later.",
+			Err:      fmt.Errorf("create subscription for %s in %s: %w", canonicalName, region, err),
+		}
 	}
 
 	slog.Info("subscription created", "username", canonicalName, "region", region, "channel_id", channelID)
-	respond(s, i, fmt.Sprintf("✅ Subscribed to **%s** (%s)!", canonicalName, region))
+	return HandlerResult{Response: fmt.Sprintf("✅ Subscribed to **%s** (%s)!", canonicalName, region)}
 }
 
-func (b *Bot) handleUnsubscribe(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 	options := i.ApplicationCommandData().Options
 	username := getOption(options, "username")
 	region := getOption(options, "region")
@@ -239,8 +287,10 @@ func (b *Bot) handleUnsubscribe(s *discordgo.Session, i *discordgo.InteractionCr
 
 	gameName, tagLine, err := riot.ParseRiotID(username)
 	if err != nil {
-		respond(s, i, "❌ Invalid Riot ID format. Use `name#tag`")
-		return
+		return HandlerResult{
+			Response: "❌ Invalid Riot ID format. Use `name#tag`",
+			Err:      NewUserError(err),
+		}
 	}
 
 	canonicalName := fmt.Sprintf("%s#%s", gameName, tagLine)
@@ -251,43 +301,46 @@ func (b *Bot) handleUnsubscribe(s *discordgo.Session, i *discordgo.InteractionCr
 		Region:           region,
 	})
 	if err != nil {
-		slog.Error("failed to delete subscription", "error", err, "username", canonicalName, "region", region, "channel_id", channelID)
-		respond(s, i, "❌ Failed to unsubscribe. Please try again later.")
-		return
+		return HandlerResult{
+			Response: "❌ Failed to unsubscribe. Please try again later.",
+			Err:      fmt.Errorf("delete subscription for %s in %s: %w", canonicalName, region, err),
+		}
 	}
 	if rowsAffected == 0 {
-		respond(s, i, fmt.Sprintf("⚠️ No subscription found for **%s** (%s)", canonicalName, region))
-		return
+		return HandlerResult{
+			Response: fmt.Sprintf("⚠️ No subscription found for **%s** (%s)", canonicalName, region),
+			Err:      NewUserError(fmt.Errorf("subscription not found: %s in %s", canonicalName, region)),
+		}
 	}
 
 	slog.Info("subscription deleted", "username", canonicalName, "region", region, "channel_id", channelID)
-	respond(s, i, fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", canonicalName, region))
+	return HandlerResult{Response: fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", canonicalName, region)}
 }
 
 func (b *Bot) handleList() ([]db.Subscription, error) {
 	return b.queries.GetAllSubscriptions(context.Background())
 }
 
-func (b *Bot) handleListForChannel(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) HandlerResult {
 	channelID := i.ChannelID
 
 	subs, err := b.queries.GetSubscriptionsByChannel(context.Background(), channelID)
 	if err != nil {
-		slog.Error("failed to list subscriptions", "error", err, "channel_id", channelID)
-		respond(s, i, "❌ Failed to list subscriptions. Please try again later.")
-		return
+		return HandlerResult{
+			Response: "❌ Failed to list subscriptions. Please try again later.",
+			Err:      fmt.Errorf("list subscriptions: %w", err),
+		}
 	}
 
 	if len(subs) == 0 {
-		respond(s, i, "No subscriptions in this channel. Use `/subscribe name#tag region` to add one!")
-		return
+		return HandlerResult{Response: "No subscriptions in this channel. Use `/subscribe name#tag region` to add one!"}
 	}
 
 	content := "**Subscriptions in this channel:**\n"
 	for _, sub := range subs {
 		content += fmt.Sprintf("• %s (%s)\n", sub.LolUsername, sub.Region)
 	}
-	respond(s, i, content)
+	return HandlerResult{Response: content}
 }
 
 func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
