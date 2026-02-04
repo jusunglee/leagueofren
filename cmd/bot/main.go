@@ -573,9 +573,9 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				return fmt.Errorf("translating usernames: %w", err)
 			}
 
-			message := formatTranslationMessage(sub.LolUsername, translations)
+			embed := formatTranslationEmbed(sub.LolUsername, translations)
 			msg, err := b.session.ChannelMessageSendComplex(sub.DiscordChannelID, &discordgo.MessageSend{
-				Content: message,
+				Embeds: []*discordgo.MessageEmbed{embed},
 				Components: []discordgo.MessageComponent{
 					discordgo.ActionsRow{
 						Components: []discordgo.MessageComponent{
@@ -636,14 +636,25 @@ func containsForeignCharacters(s string) bool {
 	return false
 }
 
-func formatTranslationMessage(username string, translations []translation.Translation) string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("**%s** is in a game!\n\n", username))
-	sb.WriteString("**Translations:**\n")
-	for _, t := range translations {
-		sb.WriteString(fmt.Sprintf("• %s → %s\n", t.Original, t.Translated))
+func formatTranslationEmbed(username string, translations []translation.Translation) *discordgo.MessageEmbed {
+	fields := make([]*discordgo.MessageEmbedField, 0, len(translations)*3)
+
+	for i, t := range translations {
+		fields = append(fields,
+			&discordgo.MessageEmbedField{Name: "Original", Value: t.Original, Inline: true},
+			&discordgo.MessageEmbedField{Name: "Translation", Value: t.Translated, Inline: true},
+		)
+		if i < len(translations)-1 {
+			fields = append(fields, &discordgo.MessageEmbedField{Name: "\u200b", Value: "\u200b", Inline: false})
+		}
 	}
-	return sb.String()
+
+	return &discordgo.MessageEmbed{
+		Title:       fmt.Sprintf("%s is in a game!", username),
+		Color:       0x5865F2,
+		Description: "Translations for players in this match:",
+		Fields:      fields,
+	}
 }
 
 // TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
