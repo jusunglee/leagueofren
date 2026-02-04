@@ -6,7 +6,8 @@ RETURNING *;
 
 -- name: GetAllSubscriptions :many
 SELECT * FROM subscriptions
-ORDER BY created_at DESC;
+ORDER BY created_at DESC
+LIMIT $1;
 
 -- name: GetSubscriptionsByChannel :many
 SELECT * FROM subscriptions
@@ -20,6 +21,11 @@ WHERE id = $1;
 -- name: DeleteSubscription :execrows
 DELETE FROM subscriptions
 WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3;
+
+-- name: UpdateSubscriptionLastEvaluatedAt :exec
+UPDATE subscriptions
+SET last_evaluated_at = NOW()
+WHERE id = $1;
 
 -- name: CreateTranslation :one
 INSERT INTO translations (username, translation)

@@ -231,3 +231,27 @@ Let's change them to return values instead. Be consistent
 ---
 
 Don't export the non cached client, only export the cached client. This may mean we will need to move some of the constructor logic over to cached but I don't want developers to be confused and accidentally use the non-cached client.
+
+---
+
+denormalize "last_evaluated_at" into the subscription schema, and create a query to update that field
+
+---
+
+Why is make migrate-up reapplying old migrations (and obviously failing bc tables already exist), shouldn't there be some kind of migrations meta table that tracks which migrations have run?
+
+---
+
+whats the difference between goose and golang-migrate?
+
+---
+
+Let's use atlas! I want to try out declarative based schema migration. How much work is it to restructure and migrate into atlas?
+
+---
+
+Set it up.
+
+---
+
+Let's put the new framework to the test. Let's create a last_eval_into field for subscription, default to NOW(). Also add server_id field.

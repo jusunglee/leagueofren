@@ -318,10 +318,6 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 	return HandlerResult{Response: fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", canonicalName, region)}
 }
 
-func (b *Bot) handleList() ([]db.Subscription, error) {
-	return b.queries.GetAllSubscriptions(context.Background())
-}
-
 func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) HandlerResult {
 	channelID := i.ChannelID
 
@@ -354,4 +350,22 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 	if err != nil {
 		slog.Error("failed to respond to interaction", "error", err)
 	}
+}
+
+func evaluateSubscriptions() error {
+	// WIP, don't touch this.
+	// TODO: support query 1 with query + index, migrate to denorm last_eval_at into subscription
+	// 2. Migrate to store server id
+	// 1. Grab 1000 oldest subscriptions
+	// 2. Group by server ID, concatenate to 20 subscriptions per server id for fairness
+	// 3. For each server grouping
+	// 4. For each subscription
+	// 5. Grab game info
+	// 6. Filter out only-english names and ignored names
+	// 7. If empty, return
+	// 8. Grab any existing translated names
+	// 8.5 ask Translator for the rest
+	// 9. combine + transform into nice message format
+	// 10. Send message
+	return nil
 }

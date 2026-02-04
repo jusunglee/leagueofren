@@ -47,9 +47,11 @@ type RiotGameCache struct {
 type Subscription struct {
 	ID               int64              `json:"id"`
 	DiscordChannelID string             `json:"discord_channel_id"`
+	ServerID         pgtype.Text        `json:"server_id"`
 	LolUsername      string             `json:"lol_username"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	Region           string             `json:"region"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	LastEvaluatedAt  pgtype.Timestamptz `json:"last_evaluated_at"`
 }
 
 type Translation struct {

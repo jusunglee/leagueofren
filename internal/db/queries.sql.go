@@ -113,7 +113,7 @@ const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (discord_channel_id, lol_username, region)
 VALUES ($1, $2, $3)
 ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
-RETURNING id, discord_channel_id, lol_username, created_at, region
+RETURNING id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 `
 
 type CreateSubscriptionParams struct {
@@ -128,9 +128,11 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 	err := row.Scan(
 		&i.ID,
 		&i.DiscordChannelID,
+		&i.ServerID,
 		&i.LolUsername,
-		&i.CreatedAt,
 		&i.Region,
+		&i.CreatedAt,
+		&i.LastEvaluatedAt,
 	)
 	return i, err
 }
@@ -214,12 +216,13 @@ func (q *Queries) DeleteSubscription(ctx context.Context, arg DeleteSubscription
 }
 
 const getAllSubscriptions = `-- name: GetAllSubscriptions :many
-SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
+SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at FROM subscriptions
 ORDER BY created_at DESC
+LIMIT $1
 `
 
-func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]Subscription, error) {
-	rows, err := q.db.Query(ctx, getAllSubscriptions)
+func (q *Queries) GetAllSubscriptions(ctx context.Context, limit int32) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, getAllSubscriptions, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -230,9 +233,11 @@ func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]Subscription, erro
 		if err := rows.Scan(
 			&i.ID,
 			&i.DiscordChannelID,
+			&i.ServerID,
 			&i.LolUsername,
-			&i.CreatedAt,
 			&i.Region,
+			&i.CreatedAt,
+			&i.LastEvaluatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -330,7 +335,7 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
+SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at FROM subscriptions
 WHERE id = $1
 `
 
@@ -340,15 +345,17 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id int64) (Subscripti
 	err := row.Scan(
 		&i.ID,
 		&i.DiscordChannelID,
+		&i.ServerID,
 		&i.LolUsername,
-		&i.CreatedAt,
 		&i.Region,
+		&i.CreatedAt,
+		&i.LastEvaluatedAt,
 	)
 	return i, err
 }
 
 const getSubscriptionsByChannel = `-- name: GetSubscriptionsByChannel :many
-SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
+SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at FROM subscriptions
 WHERE discord_channel_id = $1
 ORDER BY created_at DESC
 `
@@ -365,9 +372,11 @@ func (q *Queries) GetSubscriptionsByChannel(ctx context.Context, discordChannelI
 		if err := rows.Scan(
 			&i.ID,
 			&i.DiscordChannelID,
+			&i.ServerID,
 			&i.LolUsername,
-			&i.CreatedAt,
 			&i.Region,
+			&i.CreatedAt,
+			&i.LastEvaluatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -456,4 +465,15 @@ func (q *Queries) GetTranslationsForEval(ctx context.Context, evalID int64) ([]T
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSubscriptionLastEvaluatedAt = `-- name: UpdateSubscriptionLastEvaluatedAt :exec
+UPDATE subscriptions
+SET last_evaluated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionLastEvaluatedAt, id)
+	return err
 }
