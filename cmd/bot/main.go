@@ -7,20 +7,27 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
+	"unicode"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/joho/godotenv"
+	"github.com/jusunglee/leagueofren/internal/anthropic"
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/google"
+	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/riot"
+	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/samber/lo"
 )
 
 type Bot struct {
 	queries    *db.Queries
 	riotClient *riot.CachedClient
+	translator *translation.Translator
 }
 
 func buildRegionChoices() []*discordgo.ApplicationCommandOptionChoice {
@@ -100,7 +107,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	provider := os.Getenv("LLM_PROVIDER")
+	if provider == "" {
+		slog.Error("LLM_PROVIDER environment variable is required")
+		os.Exit(1)
+	}
+
+	model := os.Getenv("LLM_MODEL")
+	if model == "" {
+		slog.Error("LLM_MODEL environment variable is required")
+		os.Exit(1)
+	}
+
 	guildID := os.Getenv("DISCORD_GUILD_ID")
+	if guildID == "" {
+		slog.Error("DISCORD_GUILD_ID environment variable is required")
+		os.Exit(1)
+	}
 
 	ctx := context.Background()
 
@@ -112,10 +135,39 @@ func main() {
 	defer pool.Close()
 	slog.Info("connected to database")
 
+	var client llm.Client
+
+	switch provider {
+	case "anthropic":
+		apiKey := os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" {
+			fmt.Println("ANTHROPIC_API_KEY not set")
+			os.Exit(1)
+		}
+		client = anthropic.NewClient(apiKey, anthropic.Model(model))
+	case "google":
+		apiKey := os.Getenv("GOOGLE_API_KEY")
+		if apiKey == "" {
+			fmt.Println("GOOGLE_API_KEY not set")
+			os.Exit(1)
+		}
+		client, err = google.NewClient(ctx, apiKey, google.Model(model))
+		if err != nil {
+			fmt.Printf("Error creating Google client: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Printf("Unknown provider: %s (use anthropic or google)\n", model)
+		os.Exit(1)
+	}
+
+	translator := translation.NewTranslator(client)
+
 	queries := db.New(pool)
 	bot := &Bot{
 		queries:    queries,
 		riotClient: riot.NewCachedClient(riotAPIKey, queries),
+		translator: translator,
 	}
 	slog.Info("riot API client initialized with caching")
 
@@ -369,21 +421,26 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 		return s.ServerID.String
 	})
 	// 3. For each server grouping
-	for server, subs := range servers {
+	for _, subs := range servers {
 		// 4. For each subscription
 		for _, sub := range subs {
 			// 5. Grab game info
 			// Cached client so no need to denormalize
 			username, tag, err := riot.ParseRiotID(sub.LolUsername)
 			if err != nil {
-				return fmt.Errorf("getting ")
+				return fmt.Errorf("parsing riot id: %w", err)
 			}
-			acc, err := b.riotClient.GetAccountByRiotID(ctx, sub.LolUsername, sub.LolUsername, sub.Region)
+
+			acc, err := b.riotClient.GetAccountByRiotID(ctx, username, tag, sub.Region)
 			if err != nil {
 				return fmt.Errorf("getting account by riot id: %w", err)
 			}
-			game, err := b.riotClient.GetActiveGame(ctx)
 
+			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
+			if errors.Is(err, riot.ErrNotInGame) {
+				// TODO: log that user is not in game, or emit a metric. Maybe feature flag for log level?
+				continue
+			}
 			if err != nil {
 				return fmt.Errorf("getting active game %w", err)
 			}
@@ -393,21 +450,57 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 					GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
 					SubscriptionID: sub.ID,
 				})
+			// if game exists,
 			if !errors.Is(err, pgx.ErrNoRows) {
 				// TODO: Log that we've already evaluated the game for this subscription.
 				continue
 			}
 
-			// if game exists,
 			// 6. Filter out only-english names and ignored names
+			names := lo.FilterMap(game.Participants, func(p riot.Participant, i int) (string, bool) {
+				if !containsForeignCharacters(p.GameName) {
+					return "", false
+				}
+				return p.GameName, true
+			})
 			// 7. If empty, return
+			if len(names) == 0 {
+				// TODO: log
+				continue
+			}
+
 			// 8. Grab any existing translated names
+			// TODO: fix the dollar one parameter
+			translations, err := b.queries.GetTranslations(ctx, names)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("getting translations: %w", err)
+			}
+			translatedUsernames := lo.Map(translations, func(t db.Translation, i int) string {
+				return t.Username
+			})
+			names = lo.Filter(names, func(name string, i int) bool {
+				return !slices.Contains(translatedUsernames, name)
+			})
+
 			// 8.5 ask Translator for the rest
+
 			// 9. combine + transform into nice message format
 			// 10. Send message
 		}
 	}
 	return nil
+}
+
+func containsForeignCharacters(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+		if unicode.Is(unicode.Hangul, r) {
+			return true
+		}
+	}
+	return false
 }
 
 // TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
