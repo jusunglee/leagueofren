@@ -567,7 +567,6 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				continue
 			}
 
-			// 8. Grab any existing translated names
 			translations, err := b.translator.TranslateUsernames(ctx, names)
 			if err != nil {
 				return fmt.Errorf("translating usernames: %w", err)
@@ -602,6 +601,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				SubscriptionID:   sub.ID,
 				EvalStatus:       "NEW_TRANSLATIONS",
 				DiscordMessageID: pgtype.Text{String: msg.ID, Valid: true},
+				GameID:           pgtype.Int8{Int64: game.GameID, Valid: true},
 			})
 			if err != nil {
 				return fmt.Errorf("creating eval record: %w", err)

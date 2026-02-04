@@ -47,8 +47,8 @@ SELECT * FROM translations
 WHERE username = ANY($1::text[]);
 
 -- name: CreateEval :one
-INSERT INTO evals (subscription_id, eval_status, discord_message_id)
-VALUES ($1, $2, $3)
+INSERT INTO evals (subscription_id, eval_status, discord_message_id, game_id)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetLatestEvalForSubscription :one
