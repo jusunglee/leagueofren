@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 
 	"github.com/bwmarrin/discordgo"
@@ -205,6 +206,18 @@ func main() {
 			slog.Info("registered command", "command", cmd.Name)
 		}
 	}
+
+	go (func() {
+		for {
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			defer cancel()
+			err := bot.evaluateSubscriptions(ctx)
+			if err != nil {
+				slog.Error("running eval", "error", err)
+			}
+			time.Sleep(time.Minute)
+		}
+	})()
 
 	slog.Info("bot is running, press Ctrl+C to stop")
 
@@ -499,10 +512,12 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 }
 
 func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
+	slog.Info("starting eval loop...")
 	subs, err := b.queries.GetAllSubscriptions(context.Background(), 1000)
 	if err != nil {
 		return fmt.Errorf("getting all subscriptions %w", err)
 	}
+	slog.Info("subscriptions", "subs", subs, "err", err)
 
 	servers := lo.GroupBy(subs, func(s db.Subscription) string {
 		return s.ServerID.String
@@ -522,7 +537,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 
 			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
 			if errors.Is(err, riot.ErrNotInGame) {
-				slog.Debug("user not in game", "username", sub.LolUsername, "region", sub.Region)
+				slog.Info("user not in game", "username", sub.LolUsername, "region", sub.Region)
 				continue
 			}
 			if err != nil {
@@ -536,7 +551,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				})
 
 			if !errors.Is(err, pgx.ErrNoRows) {
-				slog.Debug("game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
+				slog.Info("game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
 				continue
 			}
 
@@ -548,7 +563,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 			})
 
 			if len(names) == 0 {
-				slog.Debug("no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", names)
+				slog.Info("no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
 				continue
 			}
 
@@ -604,6 +619,8 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				"translations", len(translations))
 		}
 	}
+
+	slog.Info("Done evaluating subscriptions", "num_subs", len(subs))
 	return nil
 }
 
