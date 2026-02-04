@@ -28,6 +28,7 @@ type Subscription struct {
 	DiscordChannelID string             `json:"discord_channel_id"`
 	LolUsername      string             `json:"lol_username"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	Region           string             `json:"region"`
 }
 
 type Translation struct {

@@ -1,7 +1,7 @@
 -- name: CreateSubscription :one
-INSERT INTO subscriptions (discord_channel_id, lol_username)
-VALUES ($1, $2)
-ON CONFLICT (discord_channel_id, lol_username) DO NOTHING
+INSERT INTO subscriptions (discord_channel_id, lol_username, region)
+VALUES ($1, $2, $3)
+ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
 RETURNING *;
 
 -- name: GetAllSubscriptions :many
@@ -17,9 +17,9 @@ ORDER BY created_at DESC;
 SELECT * FROM subscriptions
 WHERE id = $1;
 
--- name: DeleteSubscription :exec
+-- name: DeleteSubscription :execrows
 DELETE FROM subscriptions
-WHERE discord_channel_id = $1 AND lol_username = $2;
+WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3;
 
 -- name: CreateTranslation :one
 INSERT INTO translations (username, translation)

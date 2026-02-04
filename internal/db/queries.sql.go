@@ -60,25 +60,27 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 }
 
 const createSubscription = `-- name: CreateSubscription :one
-INSERT INTO subscriptions (discord_channel_id, lol_username)
-VALUES ($1, $2)
-ON CONFLICT (discord_channel_id, lol_username) DO NOTHING
-RETURNING id, discord_channel_id, lol_username, created_at
+INSERT INTO subscriptions (discord_channel_id, lol_username, region)
+VALUES ($1, $2, $3)
+ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
+RETURNING id, discord_channel_id, lol_username, created_at, region
 `
 
 type CreateSubscriptionParams struct {
 	DiscordChannelID string `json:"discord_channel_id"`
 	LolUsername      string `json:"lol_username"`
+	Region           string `json:"region"`
 }
 
 func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error) {
-	row := q.db.QueryRow(ctx, createSubscription, arg.DiscordChannelID, arg.LolUsername)
+	row := q.db.QueryRow(ctx, createSubscription, arg.DiscordChannelID, arg.LolUsername, arg.Region)
 	var i Subscription
 	err := row.Scan(
 		&i.ID,
 		&i.DiscordChannelID,
 		&i.LolUsername,
 		&i.CreatedAt,
+		&i.Region,
 	)
 	return i, err
 }
@@ -123,23 +125,27 @@ func (q *Queries) CreateTranslationToEval(ctx context.Context, arg CreateTransla
 	return err
 }
 
-const deleteSubscription = `-- name: DeleteSubscription :exec
+const deleteSubscription = `-- name: DeleteSubscription :execrows
 DELETE FROM subscriptions
-WHERE discord_channel_id = $1 AND lol_username = $2
+WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3
 `
 
 type DeleteSubscriptionParams struct {
 	DiscordChannelID string `json:"discord_channel_id"`
 	LolUsername      string `json:"lol_username"`
+	Region           string `json:"region"`
 }
 
-func (q *Queries) DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) error {
-	_, err := q.db.Exec(ctx, deleteSubscription, arg.DiscordChannelID, arg.LolUsername)
-	return err
+func (q *Queries) DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSubscription, arg.DiscordChannelID, arg.LolUsername, arg.Region)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getAllSubscriptions = `-- name: GetAllSubscriptions :many
-SELECT id, discord_channel_id, lol_username, created_at FROM subscriptions
+SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
 ORDER BY created_at DESC
 `
 
@@ -157,6 +163,7 @@ func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]Subscription, erro
 			&i.DiscordChannelID,
 			&i.LolUsername,
 			&i.CreatedAt,
+			&i.Region,
 		); err != nil {
 			return nil, err
 		}
@@ -189,7 +196,7 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, discord_channel_id, lol_username, created_at FROM subscriptions
+SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
 WHERE id = $1
 `
 
@@ -201,12 +208,13 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id int64) (Subscripti
 		&i.DiscordChannelID,
 		&i.LolUsername,
 		&i.CreatedAt,
+		&i.Region,
 	)
 	return i, err
 }
 
 const getSubscriptionsByChannel = `-- name: GetSubscriptionsByChannel :many
-SELECT id, discord_channel_id, lol_username, created_at FROM subscriptions
+SELECT id, discord_channel_id, lol_username, created_at, region FROM subscriptions
 WHERE discord_channel_id = $1
 ORDER BY created_at DESC
 `
@@ -225,6 +233,7 @@ func (q *Queries) GetSubscriptionsByChannel(ctx context.Context, discordChannelI
 			&i.DiscordChannelID,
 			&i.LolUsername,
 			&i.CreatedAt,
+			&i.Region,
 		); err != nil {
 			return nil, err
 		}

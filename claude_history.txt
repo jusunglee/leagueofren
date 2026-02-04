@@ -1,0 +1,109 @@
+# This is my list of queries I've made since the inception of this project. I wanted to be transparent about my AI usage,
+# which I leverage heavily throughout development. It's also fun for me to look at my own queries later for some 
+# meta strategizing about how to prompt better.
+
+Read @README.md , high level does this plan sound solid? I imagine that this discord app should be relatively simple, doesn't need a lot of moving parts, just a live api for the discocrd bot and persistent storage in postgres. Provide any feedback, anything to derisk early, and what technologies for deployment, db, etc. I was planning on just using digitalocean + spinning up a local postgres container but this seems heavily outdated, I heard people are using like supabase for db and fly.io or railway but i want to know what the latest idiomatic thing to do is
+
+---
+
+Can you bootstrap a hello world print but with all of the database setup, like the drivers, autogenned code, and the schema? I want to code the other things but I don't want to deal with bootstrapping the databse stuff
+
+---
+
+it's github.com/jusunglee
+
+---
+
+1. can we actually use go 1.26rc2, and make sure to keep in mind that we're planning to deploy this to railway so make sure that the docker stuff is abstracted denough to work locally for debugging/iterating but also deployable to railway easily
+
+---
+
+resume
+
+---
+
+try 5432 again
+
+---
+
+try again
+
+---
+
+can you run through the docker files with me
+
+---
+
+which license should I use
+
+---
+
+Create a LICENSE and a README
+
+---
+
+lets go over the discord frameworks again. Ideally we can just leverage the webhook and also allow users to slash commands without bootstrapping a whole separate API server for it-- can we do all of this with just the webhook?
+
+---
+
+Let's pivot the hello world to just a simple discord gateway (websocket). do i need to do anything on discord before we start?
+
+---
+
+alright I added it to my test server
+
+---
+
+resume
+
+---
+
+A couple of feedback: handleList should be a method we use internally only, but you can implement a handleListForChannel handler that queries for all subscriptions with that channelID
+
+---
+
+shouldn't we handle error handling for the s.InteractionRespond? what's the idiomatic way to do this, just bubble error wrapped up to handleInteraction and log / emit metric there?
+
+---
+
+Let's set up the Riot API next. Let's get a basic functionality running where the client is threaded through and we use the API to verify in handleSubscribe that the username is indeed real before creating a table for it. Test by using a fake one letter username and then a real one "zuckdynasty #gas"
+
+---
+
+Let's actually use dependency injection to pass the clients around (both db and queries) instead of global vars. Also, add every single one of my prompts (just my input) in claude_history.txt (new file)
+
+---
+
+Can we add this claude_history.txt instructions into @cmd/bot/CLAUDE.md
+
+---
+
+Let's implement region support across the stack: we'll have to create a migration to edit the schema so it's not just username in subscription, we'll have to edit the slash command to allow a region field, and validate that it's one of several hardcoded regions, and then pass through the region in the riot client. Any other place where we'd need to handle the region?
+
+---
+
+Can we create a make command for running the migration locally, should be an up and down version.
+
+---
+
+how long does it take for the new region option to be propoagated live after running, I reran make run and the server is live but it's not showing region as an option. Do I have to run a specific command to update commands in addition to registering them?
+
+---
+
+Yes, implement DISCORD_GUILD_ID handling
+
+---
+
+Is discord guild id also a way to develop as a philosophy for differentiating dev/staging and prod?
+
+---
+
+Let's propagate error stack to log but don't send the error stack to the server in the error message. Just say something like 'Failed to *action*, please try again later.' But we should log the whole error stack with our slog logger
+
+---
+
+Let's use air and create a make watch for it
+
+---
+
+In create, verify that the subscription doesnt already exist. for delete, verify that the subscription does exist. send a message accordingly if either case is triggered.
