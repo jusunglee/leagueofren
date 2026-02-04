@@ -217,4 +217,4 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Responsible AI Disclosure
 
-I leaned on Claude quite heavily here. You can see my entire prompt history in [claude_history.txt](claude_history.txt). I have never enabled allow all edits, I review every suggestion which is hopefully evident by the response history. I also welcome meta commentary on my prompt usage, always open to feedback on this front.
+I leaned on Claude quite heavily here, but I would stop short of calling this "vibe-coded". I came up with the initial plan on [initial_plan.md](initial_plan.md) and implemented this with prompts progressively, and drove the technical direction myself. You can see my entire prompt history in [claude_history.txt](claude_history.txt). I have never enabled allow all edits, I review every suggestion which is hopefully evident by the response history. I also welcome meta commentary on my prompt usage, always open to feedback on this front.
