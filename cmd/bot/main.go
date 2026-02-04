@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"slices"
+	"strings"
 	"syscall"
 	"unicode"
 
@@ -25,6 +25,7 @@ import (
 )
 
 type Bot struct {
+	session    *discordgo.Session
 	queries    *db.Queries
 	riotClient *riot.CachedClient
 	translator *translation.Translator
@@ -161,21 +162,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	translator := translation.NewTranslator(client)
-
-	queries := db.New(pool)
-	bot := &Bot{
-		queries:    queries,
-		riotClient: riot.NewCachedClient(riotAPIKey, queries),
-		translator: translator,
-	}
-	slog.Info("riot API client initialized with caching")
-
 	dg, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
 		slog.Error("failed to create Discord session", "error", err)
 		os.Exit(1)
 	}
+
+	queries := db.New(pool)
+	translator := translation.NewTranslator(client, queries, provider, model)
+
+	bot := &Bot{
+		session:    dg,
+		queries:    queries,
+		riotClient: riot.NewCachedClient(riotAPIKey, queries),
+		translator: translator,
+	}
+	slog.Info("riot API client initialized with caching")
 
 	dg.AddHandler(bot.handleInteraction)
 	dg.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
@@ -219,10 +221,17 @@ type HandlerResult struct {
 }
 
 func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.Type != discordgo.InteractionApplicationCommand {
-		return
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		b.handleCommand(s, i)
+	case discordgo.InteractionMessageComponent:
+		b.handleComponent(s, i)
+	case discordgo.InteractionModalSubmit:
+		b.handleModalSubmit(s, i)
 	}
+}
 
+func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	var result HandlerResult
 	cmd := i.ApplicationCommandData().Name
 
@@ -248,6 +257,89 @@ func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 	} else {
 		slog.Error("command failed", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
 	}
+}
+
+func (b *Bot) handleComponent(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	customID := i.MessageComponentData().CustomID
+	messageID := i.Message.ID
+
+	switch customID {
+	case "feedback_good":
+		_, err := b.queries.CreateFeedback(context.Background(), db.CreateFeedbackParams{
+			DiscordMessageID: messageID,
+			FeedbackText:     "👍",
+		})
+		if err != nil {
+			slog.Error("failed to store positive feedback", "error", err, "message_id", messageID)
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Thanks for the feedback!",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+
+	case "feedback_fix":
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID: "feedback_modal:" + messageID,
+				Title:    "Suggest a Correction",
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID:    "correction_text",
+								Label:       "What should the translation be?",
+								Style:       discordgo.TextInputParagraph,
+								Placeholder: "e.g., 托儿索 should be 'Torso' not 'Yasuo wannabe'",
+								Required:    true,
+								MaxLength:   500,
+							},
+						},
+					},
+				},
+			},
+		})
+	}
+}
+
+func (b *Bot) handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	data := i.ModalSubmitData()
+
+	parts := strings.Split(data.CustomID, ":")
+	if len(parts) != 2 || parts[0] != "feedback_modal" {
+		return
+	}
+	messageID := parts[1]
+
+	var correctionText string
+	for _, row := range data.Components {
+		if actionsRow, ok := row.(*discordgo.ActionsRow); ok {
+			for _, comp := range actionsRow.Components {
+				if input, ok := comp.(*discordgo.TextInput); ok && input.CustomID == "correction_text" {
+					correctionText = input.Value
+				}
+			}
+		}
+	}
+
+	_, err := b.queries.CreateFeedback(context.Background(), db.CreateFeedbackParams{
+		DiscordMessageID: messageID,
+		FeedbackText:     correctionText,
+	})
+	if err != nil {
+		slog.Error("failed to store correction feedback", "error", err, "message_id", messageID)
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "Thanks! Your correction has been recorded.",
+			Flags:   discordgo.MessageFlagsEphemeral,
+		},
+	})
 }
 
 type UserError struct {
@@ -407,24 +499,16 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 }
 
 func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
-	// WIP, don't touch this.
-	// TODO: support query 1 with query + index, migrate to denorm last_eval_at into subscription
-	// 0. Migrate to store server id
-	// 1. Grab 1000 oldest subscriptions
 	subs, err := b.queries.GetAllSubscriptions(context.Background(), 1000)
 	if err != nil {
 		return fmt.Errorf("getting all subscriptions %w", err)
 	}
 
-	// 2. Group by server ID, concatenate to 20 subscriptions per server id for fairness
 	servers := lo.GroupBy(subs, func(s db.Subscription) string {
 		return s.ServerID.String
 	})
-	// 3. For each server grouping
 	for _, subs := range servers {
-		// 4. For each subscription
 		for _, sub := range subs {
-			// 5. Grab game info
 			// Cached client so no need to denormalize
 			username, tag, err := riot.ParseRiotID(sub.LolUsername)
 			if err != nil {
@@ -438,7 +522,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 
 			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
 			if errors.Is(err, riot.ErrNotInGame) {
-				// TODO: log that user is not in game, or emit a metric. Maybe feature flag for log level?
+				slog.Debug("user not in game", "username", sub.LolUsername, "region", sub.Region)
 				continue
 			}
 			if err != nil {
@@ -450,42 +534,74 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 					GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
 					SubscriptionID: sub.ID,
 				})
-			// if game exists,
+
 			if !errors.Is(err, pgx.ErrNoRows) {
-				// TODO: Log that we've already evaluated the game for this subscription.
+				slog.Debug("game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
 				continue
 			}
 
-			// 6. Filter out only-english names and ignored names
 			names := lo.FilterMap(game.Participants, func(p riot.Participant, i int) (string, bool) {
 				if !containsForeignCharacters(p.GameName) {
 					return "", false
 				}
 				return p.GameName, true
 			})
-			// 7. If empty, return
+
 			if len(names) == 0 {
-				// TODO: log
+				slog.Debug("no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", names)
 				continue
 			}
 
 			// 8. Grab any existing translated names
-			// TODO: fix the dollar one parameter
-			translations, err := b.queries.GetTranslations(ctx, names)
-			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("getting translations: %w", err)
+			translations, err := b.translator.TranslateUsernames(ctx, names)
+			if err != nil {
+				return fmt.Errorf("translating usernames: %w", err)
 			}
-			translatedUsernames := lo.Map(translations, func(t db.Translation, i int) string {
-				return t.Username
-			})
-			names = lo.Filter(names, func(name string, i int) bool {
-				return !slices.Contains(translatedUsernames, name)
-			})
 
-			// 8.5 ask Translator for the rest
+			message := formatTranslationMessage(sub.LolUsername, translations)
+			msg, err := b.session.ChannelMessageSendComplex(sub.DiscordChannelID, &discordgo.MessageSend{
+				Content: message,
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.Button{
+								Label:    "Good ✓",
+								CustomID: "feedback_good",
+								Style:    discordgo.SuccessButton,
+							},
+							discordgo.Button{
+								Label:    "Suggest Fix",
+								CustomID: "feedback_fix",
+								Style:    discordgo.SecondaryButton,
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("sending discord message: %w", err)
+			}
 
-			// 9. combine + transform into nice message format
-			// 10. Send message
+			// Record the eval
+			_, err = b.queries.CreateEval(ctx, db.CreateEvalParams{
+				SubscriptionID:   sub.ID,
+				EvalStatus:       "NEW_TRANSLATIONS",
+				DiscordMessageID: pgtype.Text{String: msg.ID, Valid: true},
+			})
+			if err != nil {
+				return fmt.Errorf("creating eval record: %w", err)
+			}
+
+			err = b.queries.UpdateSubscriptionLastEvaluatedAt(ctx, sub.ID)
+			if err != nil {
+				return fmt.Errorf("updating subscription last evaluated at: %w", err)
+			}
+
+			slog.Info("sent translation message",
+				"subscription_id", sub.ID,
+				"channel_id", sub.DiscordChannelID,
+				"game_id", game.GameID,
+				"translations", len(translations))
 		}
 	}
 	return nil
@@ -501,6 +617,16 @@ func containsForeignCharacters(s string) bool {
 		}
 	}
 	return false
+}
+
+func formatTranslationMessage(username string, translations []translation.Translation) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("**%s** is in a game!\n\n", username))
+	sb.WriteString("**Translations:**\n")
+	for _, t := range translations {
+		sb.WriteString(fmt.Sprintf("• %s → %s\n", t.Original, t.Translated))
+	}
+	return sb.String()
 }
 
 // TODO: job to auto delete subscriptions not positively eval'd in 2 weeks

@@ -33,9 +33,9 @@ SET last_evaluated_at = NOW()
 WHERE id = $1;
 
 -- name: CreateTranslation :one
-INSERT INTO translations (username, translation)
-VALUES ($1, $2)
-ON CONFLICT (username) DO UPDATE SET translation = $2
+INSERT INTO translations (username, translation, provider, model)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (username) DO UPDATE SET translation = $2, provider = $3, model = $4
 RETURNING *;
 
 -- name: GetTranslation :one

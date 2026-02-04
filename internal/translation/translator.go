@@ -6,11 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/llm"
 )
 
 type Translator struct {
-	llm llm.Client
+	llm      llm.Client
+	queries  *db.Queries
+	provider string
+	model    string
 }
 
 type Translation struct {
@@ -19,8 +23,13 @@ type Translation struct {
 	Explanation string `json:"explanation,omitempty"`
 }
 
-func NewTranslator(client llm.Client) *Translator {
-	return &Translator{llm: client}
+func NewTranslator(client llm.Client, queries *db.Queries, provider, model string) *Translator {
+	return &Translator{
+		llm:      client,
+		queries:  queries,
+		provider: provider,
+		model:    model,
+	}
 }
 
 const systemPrompt = `You are translating League of Legends summoner names from Korean and Chinese to English.
@@ -40,9 +49,37 @@ func (t *Translator) TranslateUsernames(ctx context.Context, usernames []string)
 		return nil, nil
 	}
 
+	cached, err := t.queries.GetTranslations(ctx, usernames)
+	if err != nil {
+		return nil, fmt.Errorf("cache lookup failed: %w", err)
+	}
+
+	cachedMap := make(map[string]string, len(cached))
+	for _, c := range cached {
+		cachedMap[c.Username] = c.Translation
+	}
+
+	var results []Translation
+	var uncached []string
+
+	for _, username := range usernames {
+		if translation, ok := cachedMap[username]; ok {
+			results = append(results, Translation{
+				Original:   username,
+				Translated: translation,
+			})
+		} else {
+			uncached = append(uncached, username)
+		}
+	}
+
+	if len(uncached) == 0 {
+		return results, nil
+	}
+
 	var sb strings.Builder
 	sb.WriteString("Translate these summoner names:\n")
-	for _, name := range usernames {
+	for _, name := range uncached {
 		sb.WriteString("- ")
 		sb.WriteString(name)
 		sb.WriteString("\n")
@@ -58,5 +95,29 @@ func (t *Translator) TranslateUsernames(ctx context.Context, usernames []string)
 		return nil, fmt.Errorf("failed to parse translation response: %w (response: %s)", err, text)
 	}
 
-	return translations, nil
+	for _, tr := range translations {
+		composed := composeTranslation(tr)
+		_, err := t.queries.CreateTranslation(ctx, db.CreateTranslationParams{
+			Username:    tr.Original,
+			Translation: composed,
+			Provider:    t.provider,
+			Model:       t.model,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to cache translation for %s: %w", tr.Original, err)
+		}
+		results = append(results, Translation{
+			Original:   tr.Original,
+			Translated: composed,
+		})
+	}
+
+	return results, nil
+}
+
+func composeTranslation(tr Translation) string {
+	if tr.Explanation == "" {
+		return tr.Translated
+	}
+	return fmt.Sprintf("%s (%s)", tr.Translated, tr.Explanation)
 }

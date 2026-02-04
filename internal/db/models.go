@@ -59,6 +59,8 @@ type Translation struct {
 	ID          int64              `json:"id"`
 	Username    string             `json:"username"`
 	Translation string             `json:"translation"`
+	Provider    string             `json:"provider"`
+	Model       string             `json:"model"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 

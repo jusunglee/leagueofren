@@ -139,24 +139,33 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 }
 
 const createTranslation = `-- name: CreateTranslation :one
-INSERT INTO translations (username, translation)
-VALUES ($1, $2)
-ON CONFLICT (username) DO UPDATE SET translation = $2
-RETURNING id, username, translation, created_at
+INSERT INTO translations (username, translation, provider, model)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (username) DO UPDATE SET translation = $2, provider = $3, model = $4
+RETURNING id, username, translation, provider, model, created_at
 `
 
 type CreateTranslationParams struct {
 	Username    string `json:"username"`
 	Translation string `json:"translation"`
+	Provider    string `json:"provider"`
+	Model       string `json:"model"`
 }
 
 func (q *Queries) CreateTranslation(ctx context.Context, arg CreateTranslationParams) (Translation, error) {
-	row := q.db.QueryRow(ctx, createTranslation, arg.Username, arg.Translation)
+	row := q.db.QueryRow(ctx, createTranslation,
+		arg.Username,
+		arg.Translation,
+		arg.Provider,
+		arg.Model,
+	)
 	var i Translation
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.Translation,
+		&i.Provider,
+		&i.Model,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -416,7 +425,7 @@ func (q *Queries) GetSubscriptionsByChannel(ctx context.Context, discordChannelI
 }
 
 const getTranslation = `-- name: GetTranslation :one
-SELECT id, username, translation, created_at FROM translations
+SELECT id, username, translation, provider, model, created_at FROM translations
 WHERE username = $1
 `
 
@@ -427,13 +436,15 @@ func (q *Queries) GetTranslation(ctx context.Context, username string) (Translat
 		&i.ID,
 		&i.Username,
 		&i.Translation,
+		&i.Provider,
+		&i.Model,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getTranslations = `-- name: GetTranslations :many
-SELECT id, username, translation, created_at FROM translations
+SELECT id, username, translation, provider, model, created_at FROM translations
 WHERE username = ANY($1::text[])
 `
 
@@ -450,6 +461,8 @@ func (q *Queries) GetTranslations(ctx context.Context, dollar_1 []string) ([]Tra
 			&i.ID,
 			&i.Username,
 			&i.Translation,
+			&i.Provider,
+			&i.Model,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -463,7 +476,7 @@ func (q *Queries) GetTranslations(ctx context.Context, dollar_1 []string) ([]Tra
 }
 
 const getTranslationsForEval = `-- name: GetTranslationsForEval :many
-SELECT t.id, t.username, t.translation, t.created_at
+SELECT t.id, t.username, t.translation, t.provider, t.model, t.created_at
 FROM translations t
 JOIN translation_to_evals tte ON t.id = tte.translation_id
 WHERE tte.eval_id = $1
@@ -482,6 +495,8 @@ func (q *Queries) GetTranslationsForEval(ctx context.Context, evalID int64) ([]T
 			&i.ID,
 			&i.Username,
 			&i.Translation,
+			&i.Provider,
+			&i.Model,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

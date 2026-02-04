@@ -271,3 +271,27 @@ I can't get GetEvalByGameAndSubscription query to cast as int64, do I have to st
 ---
 
 The format that riot returns it is int64. Is there any reason to store this as a string? It's more consistent to keep the type the same throughout
+
+---
+
+Change the translator package to cache the translation, after composing the 3 components into one string. Also add the provider + model used as columns in the translations table
+
+---
+
+shouldnt we use GetTranslations? Or is the single query better here
+
+---
+
+continue with this approach
+
+---
+
+Implement steps 9 and 10 of evaluateSubscriptions in @main.go
+
+---
+
+Write the string builder into a separate function
+
+---
+
+is it a good idea to implement a feedback button + prompt into the message, or is there a more discord native way to retrieve this info?
