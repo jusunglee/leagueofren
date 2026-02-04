@@ -46,7 +46,7 @@ type CacheGameStatusParams struct {
 	Puuid        string      `json:"puuid"`
 	Region       string      `json:"region"`
 	InGame       bool        `json:"in_game"`
-	GameID       pgtype.Text `json:"game_id"`
+	GameID       pgtype.Int8 `json:"game_id"`
 	Participants []byte      `json:"participants"`
 }
 
@@ -64,7 +64,7 @@ func (q *Queries) CacheGameStatus(ctx context.Context, arg CacheGameStatusParams
 const createEval = `-- name: CreateEval :one
 INSERT INTO evals (subscription_id, eval_status, discord_message_id)
 VALUES ($1, $2, $3)
-RETURNING id, subscription_id, evaluated_at, eval_status, discord_message_id
+RETURNING id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id
 `
 
 type CreateEvalParams struct {
@@ -79,6 +79,7 @@ func (q *Queries) CreateEval(ctx context.Context, arg CreateEvalParams) (Eval, e
 	err := row.Scan(
 		&i.ID,
 		&i.SubscriptionID,
+		&i.GameID,
 		&i.EvaluatedAt,
 		&i.EvalStatus,
 		&i.DiscordMessageID,
@@ -296,7 +297,7 @@ type GetCachedGameStatusRow struct {
 	Puuid        string      `json:"puuid"`
 	Region       string      `json:"region"`
 	InGame       bool        `json:"in_game"`
-	GameID       pgtype.Text `json:"game_id"`
+	GameID       pgtype.Int8 `json:"game_id"`
 	Participants []byte      `json:"participants"`
 }
 
@@ -314,8 +315,33 @@ func (q *Queries) GetCachedGameStatus(ctx context.Context, arg GetCachedGameStat
 	return i, err
 }
 
+const getEvalByGameAndSubscription = `-- name: GetEvalByGameAndSubscription :one
+SELECT id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id FROM evals
+WHERE game_id = $1 AND subscription_id = $2
+LIMIT 1
+`
+
+type GetEvalByGameAndSubscriptionParams struct {
+	GameID         pgtype.Int8 `json:"game_id"`
+	SubscriptionID int64       `json:"subscription_id"`
+}
+
+func (q *Queries) GetEvalByGameAndSubscription(ctx context.Context, arg GetEvalByGameAndSubscriptionParams) (Eval, error) {
+	row := q.db.QueryRow(ctx, getEvalByGameAndSubscription, arg.GameID, arg.SubscriptionID)
+	var i Eval
+	err := row.Scan(
+		&i.ID,
+		&i.SubscriptionID,
+		&i.GameID,
+		&i.EvaluatedAt,
+		&i.EvalStatus,
+		&i.DiscordMessageID,
+	)
+	return i, err
+}
+
 const getLatestEvalForSubscription = `-- name: GetLatestEvalForSubscription :one
-SELECT id, subscription_id, evaluated_at, eval_status, discord_message_id FROM evals
+SELECT id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id FROM evals
 WHERE subscription_id = $1
 ORDER BY evaluated_at DESC
 LIMIT 1
@@ -327,6 +353,7 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 	err := row.Scan(
 		&i.ID,
 		&i.SubscriptionID,
+		&i.GameID,
 		&i.EvaluatedAt,
 		&i.EvalStatus,
 		&i.DiscordMessageID,

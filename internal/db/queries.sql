@@ -9,6 +9,11 @@ SELECT * FROM subscriptions
 ORDER BY created_at DESC
 LIMIT $1;
 
+-- name: GetEvalByGameAndSubscription :one
+SELECT * FROM evals
+WHERE game_id = $1 AND subscription_id = $2
+LIMIT 1;
+
 -- name: GetSubscriptionsByChannel :many
 SELECT * FROM subscriptions
 WHERE discord_channel_id = $1

@@ -11,9 +11,11 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/joho/godotenv"
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/riot"
+	"github.com/samber/lo"
 )
 
 type Bot struct {
@@ -352,20 +354,61 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 	}
 }
 
-func evaluateSubscriptions() error {
+func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 	// WIP, don't touch this.
 	// TODO: support query 1 with query + index, migrate to denorm last_eval_at into subscription
-	// 2. Migrate to store server id
+	// 0. Migrate to store server id
 	// 1. Grab 1000 oldest subscriptions
+	subs, err := b.queries.GetAllSubscriptions(context.Background(), 1000)
+	if err != nil {
+		return fmt.Errorf("getting all subscriptions %w", err)
+	}
+
 	// 2. Group by server ID, concatenate to 20 subscriptions per server id for fairness
+	servers := lo.GroupBy(subs, func(s db.Subscription) string {
+		return s.ServerID.String
+	})
 	// 3. For each server grouping
-	// 4. For each subscription
-	// 5. Grab game info
-	// 6. Filter out only-english names and ignored names
-	// 7. If empty, return
-	// 8. Grab any existing translated names
-	// 8.5 ask Translator for the rest
-	// 9. combine + transform into nice message format
-	// 10. Send message
+	for server, subs := range servers {
+		// 4. For each subscription
+		for _, sub := range subs {
+			// 5. Grab game info
+			// Cached client so no need to denormalize
+			username, tag, err := riot.ParseRiotID(sub.LolUsername)
+			if err != nil {
+				return fmt.Errorf("getting ")
+			}
+			acc, err := b.riotClient.GetAccountByRiotID(ctx, sub.LolUsername, sub.LolUsername, sub.Region)
+			if err != nil {
+				return fmt.Errorf("getting account by riot id: %w", err)
+			}
+			game, err := b.riotClient.GetActiveGame(ctx)
+
+			if err != nil {
+				return fmt.Errorf("getting active game %w", err)
+			}
+
+			_, err = b.queries.GetEvalByGameAndSubscription(ctx,
+				db.GetEvalByGameAndSubscriptionParams{
+					GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
+					SubscriptionID: sub.ID,
+				})
+			if !errors.Is(err, pgx.ErrNoRows) {
+				// TODO: Log that we've already evaluated the game for this subscription.
+				continue
+			}
+
+			// if game exists,
+			// 6. Filter out only-english names and ignored names
+			// 7. If empty, return
+			// 8. Grab any existing translated names
+			// 8.5 ask Translator for the rest
+			// 9. combine + transform into nice message format
+			// 10. Send message
+		}
+	}
 	return nil
 }
+
+// TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
+// Limit

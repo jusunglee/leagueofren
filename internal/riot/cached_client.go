@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -75,12 +74,8 @@ func (c *CachedClient) GetActiveGame(ctx context.Context, puuid, region string) 
 			}
 		}
 
-		gameID, err := strconv.ParseInt(cached.GameID.String, 10, 64)
-		if err != nil {
-			return ActiveGame{}, fmt.Errorf("failed to parse cached game ID: %w", err)
-		}
 		return ActiveGame{
-			GameID:       gameID,
+			GameID:       cached.GameID.Int64,
 			Participants: participants,
 		}, nil
 	}
@@ -112,7 +107,7 @@ func (c *CachedClient) GetActiveGame(ctx context.Context, puuid, region string) 
 		Puuid:        puuid,
 		Region:       region,
 		InGame:       true,
-		GameID:       pgtype.Text{String: strconv.FormatInt(game.GameID, 10), Valid: true},
+		GameID:       pgtype.Int8{Int64: game.GameID, Valid: true},
 		Participants: participantsJSON,
 	}); err != nil {
 		return ActiveGame{}, fmt.Errorf("failed to cache game status: %w", err)

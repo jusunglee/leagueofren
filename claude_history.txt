@@ -263,3 +263,11 @@ Let's migrate to add game_id to eval, I want to be able to track if I already ev
 ---
 
 Edit the @README.md with the new technical details. Especially update the setup guide so that users are easily able to bootstrap the bot and get it going locally, such as postgres, atlas, which tokens to get and links to get them, etc.
+
+---
+
+I can't get GetEvalByGameAndSubscription query to cast as int64, do I have to store this type mapping somewhere? Somehow I thought sqlc would be "smart" enough to know this already, perhaps even by querying the local database.
+
+---
+
+The format that riot returns it is int64. Is there any reason to store this as a string? It's more consistent to keep the type the same throughout

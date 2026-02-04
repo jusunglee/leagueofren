@@ -16,6 +16,7 @@ CREATE INDEX idx_subscriptions_last_evaluated_at ON subscriptions(last_evaluated
 CREATE TABLE evals (
     id BIGSERIAL PRIMARY KEY,
     subscription_id BIGINT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    game_id BIGINT,
     evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     eval_status TEXT NOT NULL,
     discord_message_id TEXT,
@@ -24,6 +25,7 @@ CREATE TABLE evals (
 
 CREATE INDEX idx_evals_subscription_id ON evals(subscription_id);
 CREATE INDEX idx_evals_evaluated_at ON evals(evaluated_at);
+CREATE INDEX idx_evals_subscription_game ON evals(subscription_id, game_id);
 
 -- Translations table (cached username translations)
 CREATE TABLE translations (
@@ -70,7 +72,7 @@ CREATE TABLE riot_game_cache (
     puuid TEXT NOT NULL,
     region TEXT NOT NULL,
     in_game BOOLEAN NOT NULL,
-    game_id TEXT,
+    game_id BIGINT,
     participants JSONB,
     cached_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,

@@ -11,6 +11,7 @@ import (
 type Eval struct {
 	ID               int64              `json:"id"`
 	SubscriptionID   int64              `json:"subscription_id"`
+	GameID           pgtype.Int8        `json:"game_id"`
 	EvaluatedAt      pgtype.Timestamptz `json:"evaluated_at"`
 	EvalStatus       string             `json:"eval_status"`
 	DiscordMessageID pgtype.Text        `json:"discord_message_id"`
@@ -38,7 +39,7 @@ type RiotGameCache struct {
 	Puuid        string             `json:"puuid"`
 	Region       string             `json:"region"`
 	InGame       bool               `json:"in_game"`
-	GameID       pgtype.Text        `json:"game_id"`
+	GameID       pgtype.Int8        `json:"game_id"`
 	Participants []byte             `json:"participants"`
 	CachedAt     pgtype.Timestamptz `json:"cached_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
