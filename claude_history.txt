@@ -135,3 +135,59 @@ Create a precommit hook to gofmt + compile
 ---
 
 I'm pretty sure there's a way to track git pre commit hooks for a repo.
+
+---
+
+Let's implement the "translation" package which will use a simple LLM API call with a hardcoded prompt to translate the korean or chinese string into english, including any context. Let's brainstorm on which LLM to use, and our platform options on leveraging it.
+
+---
+
+I said haiku as a fill-in. Are haiku-style models the right choice here for the job, or are they not "smart" enough for context translating?
+
+---
+
+Read the README here https://github.com/anthropics/anthropic-sdk-go
+
+---
+
+Let's write up a quick script/cli to test the client
+
+---
+
+Add it to the make
+
+---
+
+allow it to take in a param instead of hardcoding the test names
+
+---
+
+Let's use fflags instead
+
+---
+
+what about with make?
+
+---
+
+What happened here? This was strange considering what seems to be a valid response: (error about markdown code blocks in JSON response)
+
+---
+
+Can we restructure the packages a bit so that the "translator" layer is separated from the model client layer? Ideally we ahve a translate layer and an anthropic client layer, and we're merely passing in the anthropic client to the translator.
+
+---
+
+Great, let's also support Gemma3-27b.
+
+---
+
+Let's also allow passing in specific models for both google and anthropic but use the current hardcoded ones as defaults
+
+---
+
+Let's force using the specific type that the internal lib has for the model names, for example in anthropics it's type Model
+
+---
+
+Change the githook so that we auto gofmt commits and stage the changes instead of merely failing when a file is not formatted.

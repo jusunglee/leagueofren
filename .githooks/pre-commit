@@ -7,11 +7,11 @@ set -e
 echo "Running gofmt..."
 UNFORMATTED=$(gofmt -l .)
 if [ -n "$UNFORMATTED" ]; then
-    echo "ERROR: The following files are not formatted:"
+    echo "Formatting files:"
     echo "$UNFORMATTED"
-    echo ""
-    echo "Run 'gofmt -w .' to fix"
-    exit 1
+    gofmt -w .
+    echo "$UNFORMATTED" | xargs git add
+    echo "Formatted and staged."
 fi
 
 echo "Running go build..."

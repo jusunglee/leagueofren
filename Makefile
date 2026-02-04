@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs migrate-up migrate-down migrate-create sqlc run watch build clean
+.PHONY: help setup db-up db-down db-logs migrate-up migrate-down migrate-create sqlc run watch build clean translate-test
 
 # Default target
 help:
@@ -12,6 +12,8 @@ help:
 	@echo "  make migrate-create - Create a new migration (usage: make migrate-create name=my_migration)"
 	@echo "  make sqlc           - Generate Go code from SQL queries"
 	@echo "  make run            - Run the bot locally"
+	@echo "  make watch          - Run the bot with live reload"
+	@echo "  make translate-test - Test translation (usage: make translate-test names=\"托儿索,페이커\")"
 	@echo "  make build          - Build the bot binary"
 	@echo "  make clean          - Clean build artifacts"
 
@@ -84,6 +86,17 @@ watch:
 	fi
 	@command -v air >/dev/null 2>&1 || { echo "Installing air..."; go install github.com/air-verse/air@latest; }
 	air
+
+# Test translation client
+# usage: make translate-test names="托儿索,페이커"
+# usage: make translate-test names="托儿索" provider=google
+# usage: make translate-test names="托儿索" model=claude-haiku-4-5
+translate-test:
+	@if [ -z "$(names)" ]; then \
+		echo "Usage: make translate-test names=\"托儿索,페이커\" [provider=anthropic|google] [model=MODEL]"; \
+		exit 1; \
+	fi
+	go run cmd/translate-test/main.go -names "$(names)" -provider "$(or $(provider),anthropic)" -model "$(model)"
 
 # Build the bot
 build:

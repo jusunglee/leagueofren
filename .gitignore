@@ -10,6 +10,7 @@ tmp/
 
 # Test binary
 *.test
+translate-test
 
 # Output of the go coverage tool
 *.out
