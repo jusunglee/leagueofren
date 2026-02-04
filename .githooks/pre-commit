@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Pre-commit hook: gofmt + compile
+
+set -e
+
+echo "Running gofmt..."
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+    echo "ERROR: The following files are not formatted:"
+    echo "$UNFORMATTED"
+    echo ""
+    echo "Run 'gofmt -w .' to fix"
+    exit 1
+fi
+
+echo "Running go build..."
+go build ./...
+
+echo "Pre-commit checks passed"

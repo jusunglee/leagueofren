@@ -1,8 +1,9 @@
-.PHONY: help db-up db-down db-logs migrate-up migrate-down migrate-create sqlc run watch build clean
+.PHONY: help setup db-up db-down db-logs migrate-up migrate-down migrate-create sqlc run watch build clean
 
 # Default target
 help:
 	@echo "Available commands:"
+	@echo "  make setup          - Set up development environment (git hooks)"
 	@echo "  make db-up          - Start local PostgreSQL container"
 	@echo "  make db-down        - Stop local PostgreSQL container"
 	@echo "  make db-logs        - View PostgreSQL logs"
@@ -13,6 +14,11 @@ help:
 	@echo "  make run            - Run the bot locally"
 	@echo "  make build          - Build the bot binary"
 	@echo "  make clean          - Clean build artifacts"
+
+# Development setup
+setup:
+	git config core.hooksPath .githooks
+	@echo "Git hooks configured"
 
 # Docker Compose commands
 db-up:
