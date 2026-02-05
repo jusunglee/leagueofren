@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -24,6 +25,8 @@ import (
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/samber/lo"
 )
 
@@ -262,27 +265,78 @@ func main() {
 		log.InfoContext(ctx, "registered commands", "count", len(commands))
 	}
 
-	go (func() {
-		for {
-			evalCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			defer cancel()
-			err := bot.evaluateSubscriptions(evalCtx)
-			if err != nil {
-				log.ErrorContext(evalCtx, "running eval", "error", err)
-			}
-			time.Sleep(time.Minute)
-		}
-	})()
+	ch := make(chan sendMessageJob)
+	var wg *sync.WaitGroup
 
+	wg.Add(1)
 	go (func() {
+		defer wg.Done()
 		for {
 			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 			defer cancel()
-			err := bot.cleanupOldData(ctx)
+			jobs, err := bot.produceTranslationMessages(ctx)
 			if err != nil {
-				log.Error("deleting old data", "error", err)
+				log.ErrorContext(ctx, "running eval", "error", err)
+				sleepWithContext(ctx, time.Minute)
+				continue
 			}
-			time.Sleep(time.Hour)
+
+			for _, job := range jobs {
+				select {
+				case <-ctx.Done():
+					log.InfoContext(ctx, "context done, exiting producer")
+					return
+				case ch <- job:
+					log.InfoContext(ctx, "sent job", slog.String("channel_id", job.channelID), slog.Int64("game_id", job.gameID), slog.Int64("subscription_id", job.subscriptionID))
+				}
+			}
+
+			sleepWithContext(ctx, time.Minute)
+		}
+	})()
+
+	wg.Add(1)
+	go (func() {
+		defer wg.Done()
+		for {
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			defer cancel()
+			select {
+			case <-ctx.Done():
+				log.InfoContext(ctx, "context done, exiting consumer")
+				return
+			case job, ok := <-ch:
+				if !ok {
+					log.WarnContext(ctx, "channel closed, exiting consumer")
+				}
+				evalCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+				defer cancel()
+				err := bot.consumeTranslationMessages(evalCtx, job)
+				if err != nil {
+					log.ErrorContext(evalCtx, "running eval", "error", err)
+				}
+			}
+		}
+	})()
+
+	wg.Add(1)
+	go (func() {
+		defer wg.Done()
+		for {
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			defer cancel()
+			select {
+			case <-ctx.Done():
+				log.InfoContext(ctx, "context done, exiting consumer")
+				return
+			default:
+				err := bot.cleanupOldData(ctx)
+				if err != nil {
+					log.Error("deleting old data", "error", err)
+				}
+			}
+
+			sleepWithContext(ctx, time.Hour)
 		}
 	})()
 
@@ -292,7 +346,22 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
+	wg.Wait()
+	close(sigChan)
+	close(ch)
+
 	log.InfoContext(ctx, "shutting down")
+}
+
+func sleepWithContext(ctx context.Context, dur time.Duration) {
+	for {
+		select {
+		case <-time.After(dur):
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 type HandlerResult struct {
@@ -603,119 +672,163 @@ func (b *Bot) respond(s *discordgo.Session, i *discordgo.InteractionCreate, cont
 	}
 }
 
-func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
+type sendMessageJob struct {
+	message        *discordgo.MessageEmbed
+	subscriptionID int64
+	channelID      string
+	gameID         int64
+}
+
+// Work routines at the server level so that problematic behavior or job size's blast radius is
+// isolated to the server, instead of impacting the production of messages for other servers who are playing fairly.
+func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]sendMessageJob, error) {
+	var jobs []sendMessageJob
+	for _, sub := range subs {
+		// Cached client so no need to denormalize
+		username, tag, err := riot.ParseRiotID(sub.LolUsername)
+		if err != nil {
+			return nil, fmt.Errorf("parsing riot id: %w", err)
+		}
+
+		acc, err := b.riotClient.GetAccountByRiotID(ctx, username, tag, sub.Region)
+		if err != nil {
+			return nil, fmt.Errorf("getting account by riot id: %w", err)
+		}
+
+		game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
+		if errors.Is(err, riot.ErrNotInGame) {
+			b.log.InfoContext(ctx, "user not in game", "username", sub.LolUsername, "region", sub.Region)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("getting active game %w", err)
+		}
+
+		_, err = b.queries.GetEvalByGameAndSubscription(ctx,
+			db.GetEvalByGameAndSubscriptionParams{
+				GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
+				SubscriptionID: sub.ID,
+			})
+
+		if !errors.Is(err, pgx.ErrNoRows) {
+			b.log.InfoContext(ctx, "game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
+			continue
+		}
+
+		names := lo.FilterMap(game.Participants, func(p riot.Participant, i int) (string, bool) {
+			if !containsForeignCharacters(p.GameName) {
+				return "", false
+			}
+			// Not sure the best way to handle error gracefully but no way it fails at this point right? Ignore for now.
+			name, _, _ := riot.ParseRiotID(p.GameName)
+			return name, true
+		})
+
+		if len(names) == 0 {
+			b.log.InfoContext(ctx, "no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
+			continue
+		}
+
+		translations, err := b.translator.TranslateUsernames(ctx, names)
+		if err != nil {
+			return nil, fmt.Errorf("translating usernames: %w", err)
+		}
+
+		embed := formatTranslationEmbed(sub.LolUsername, translations)
+		jobs = append(jobs, sendMessageJob{
+			message:        embed,
+			channelID:      sub.DiscordChannelID,
+			subscriptionID: sub.ID,
+			gameID:         game.GameID,
+		})
+	}
+
+	return jobs, nil
+}
+
+func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob) error {
+	msg, err := b.session.ChannelMessageSendComplex(job.channelID, &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{job.message},
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Good ✓",
+						CustomID: "feedback_good",
+						Style:    discordgo.SuccessButton,
+					},
+					discordgo.Button{
+						Label:    "Suggest Fix",
+						CustomID: "feedback_fix",
+						Style:    discordgo.SecondaryButton,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("sending discord message: %w", err)
+	}
+
+	// TODO: do all this under a transaction because it's an invariant violation to create a eval but not update the denormalized subscription field
+	_, err = b.queries.CreateEval(ctx, db.CreateEvalParams{
+		SubscriptionID:   job.subscriptionID,
+		EvalStatus:       "NEW_TRANSLATIONS",
+		DiscordMessageID: pgtype.Text{String: msg.ID, Valid: true},
+		GameID:           pgtype.Int8{Int64: job.gameID, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("creating eval record: %w", err)
+	}
+
+	err = b.queries.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
+	if err != nil {
+		return fmt.Errorf("updating subscription last evaluated at: %w", err)
+	}
+
+	b.log.InfoContext(ctx, "sent and processed translation message",
+		"subscription_id", job.subscriptionID,
+		"channel_id", job.channelID,
+		"game_id", job.gameID,
+	)
+
+	return nil
+}
+
+func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob, error) {
 	b.log.InfoContext(ctx, "starting eval loop...")
 	subs, err := b.queries.GetAllSubscriptions(ctx, 1000)
 	if err != nil {
-		return fmt.Errorf("getting all subscriptions %w", err)
+		return nil, fmt.Errorf("getting all subscriptions %w", err)
 	}
 	b.log.InfoContext(ctx, "subscriptions", "subs", subs, "err", err)
 
 	servers := lo.GroupBy(subs, func(s db.Subscription) string {
 		return s.ServerID
 	})
-	for _, subs := range servers {
-		for _, sub := range subs {
-			// Cached client so no need to denormalize
-			username, tag, err := riot.ParseRiotID(sub.LolUsername)
+
+	var eg errgroup.Group
+	var mu sync.Mutex
+	var jobs []sendMessageJob
+
+	for server, subs := range servers {
+		eg.Go(func() error {
+			serverJobs, err := b.produceForServer(ctx, subs)
+			jobs = append(jobs, serverJobs...)
+			mu.Lock()
+			mu.Unlock()
 			if err != nil {
-				return fmt.Errorf("parsing riot id: %w", err)
+				return fmt.Errorf("producing for server %s: %w", server, err)
 			}
-
-			acc, err := b.riotClient.GetAccountByRiotID(ctx, username, tag, sub.Region)
-			if err != nil {
-				return fmt.Errorf("getting account by riot id: %w", err)
-			}
-
-			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
-			if errors.Is(err, riot.ErrNotInGame) {
-				b.log.InfoContext(ctx, "user not in game", "username", sub.LolUsername, "region", sub.Region)
-				continue
-			}
-			if err != nil {
-				return fmt.Errorf("getting active game %w", err)
-			}
-
-			_, err = b.queries.GetEvalByGameAndSubscription(ctx,
-				db.GetEvalByGameAndSubscriptionParams{
-					GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
-					SubscriptionID: sub.ID,
-				})
-
-			if !errors.Is(err, pgx.ErrNoRows) {
-				b.log.InfoContext(ctx, "game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
-				continue
-			}
-
-			names := lo.FilterMap(game.Participants, func(p riot.Participant, i int) (string, bool) {
-				if !containsForeignCharacters(p.GameName) {
-					return "", false
-				}
-				// Not sure the best way to handle error gracefully but no way it fails at this point right? Ignore for now.
-				name, _, _ := riot.ParseRiotID(p.GameName)
-				return name, true
-			})
-
-			if len(names) == 0 {
-				b.log.InfoContext(ctx, "no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
-				continue
-			}
-
-			translations, err := b.translator.TranslateUsernames(ctx, names)
-			if err != nil {
-				return fmt.Errorf("translating usernames: %w", err)
-			}
-
-			embed := formatTranslationEmbed(sub.LolUsername, translations)
-			msg, err := b.session.ChannelMessageSendComplex(sub.DiscordChannelID, &discordgo.MessageSend{
-				Embeds: []*discordgo.MessageEmbed{embed},
-				Components: []discordgo.MessageComponent{
-					discordgo.ActionsRow{
-						Components: []discordgo.MessageComponent{
-							discordgo.Button{
-								Label:    "Good ✓",
-								CustomID: "feedback_good",
-								Style:    discordgo.SuccessButton,
-							},
-							discordgo.Button{
-								Label:    "Suggest Fix",
-								CustomID: "feedback_fix",
-								Style:    discordgo.SecondaryButton,
-							},
-						},
-					},
-				},
-			})
-			if err != nil {
-				return fmt.Errorf("sending discord message: %w", err)
-			}
-
-			// Record the eval
-			_, err = b.queries.CreateEval(ctx, db.CreateEvalParams{
-				SubscriptionID:   sub.ID,
-				EvalStatus:       "NEW_TRANSLATIONS",
-				DiscordMessageID: pgtype.Text{String: msg.ID, Valid: true},
-				GameID:           pgtype.Int8{Int64: game.GameID, Valid: true},
-			})
-			if err != nil {
-				return fmt.Errorf("creating eval record: %w", err)
-			}
-
-			err = b.queries.UpdateSubscriptionLastEvaluatedAt(ctx, sub.ID)
-			if err != nil {
-				return fmt.Errorf("updating subscription last evaluated at: %w", err)
-			}
-
-			b.log.InfoContext(ctx, "sent translation message",
-				"subscription_id", sub.ID,
-				"channel_id", sub.DiscordChannelID,
-				"game_id", game.GameID,
-				"translations", len(translations))
-		}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		// TODO: Best effort, even if there's an error with one job we should return as much as we can
+		return nil, fmt.Errorf("producing translation messages: %w", err)
 	}
 
-	b.log.InfoContext(ctx, "Done evaluating subscriptions", "num_subs", len(subs))
-	return nil
+	return jobs, nil
 }
 
 func containsForeignCharacters(s string) bool {
@@ -799,5 +912,5 @@ func (b *Bot) cleanupOldData(ctx context.Context) error {
 
 // TODO: Support dockerization because I know people would want to run this on their local windows while also playing league
 // TODO: Support ignore lists
-// TODO: metrics into grafana/loki
-// TODO: Coalesce same party-channel-server results into the same message, and ignore them
+// TODO: If limits get tight we can restrict one subscription signature per server, so you can't have duplicate subscriptions over different channels in the same server
+// TODO: metrics into grafana/lokiw

@@ -307,3 +307,6 @@ Design a Bubbletea TUI setup tool for this Go project.
 2026-02-04 23:46:33 - User: In the input prompt for the discord section, the input field should have a label, paste the token from step x here
 2026-02-04 23:52:53 - User: edit the other input prompts so that it's clear what the user is supposed to paste in
 replace all log.Info or Warn or Error with the context version
+Add the exhaustruct linter rule
+Add the linter to the precommit hook, including the setup for it
+Can you code review my producer consumer model? This is my first attempt at using channels and I want to make sure it's set up idiomatically. There should be no deadlocks, no invisible errors, and the shutdown should be graceful.
