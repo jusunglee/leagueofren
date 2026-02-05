@@ -195,18 +195,23 @@ func main() {
 	defer dg.Close()
 
 	if guildID != "" {
-		slog.Info("registering commands to guild (instant updates)", "guild_id", guildID)
+		slog.Info("registering commands to guild", "guild_id", guildID)
+		// Clear any stale global commands
+		_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", []*discordgo.ApplicationCommand{})
+		if err != nil {
+			slog.Warn("failed to clear global commands", "error", err)
+		} else {
+			slog.Info("cleared global commands")
+		}
 	} else {
 		slog.Info("registering commands globally (may take up to 1 hour to propagate)")
 	}
 
-	for _, cmd := range commands {
-		_, err := dg.ApplicationCommandCreate(dg.State.User.ID, guildID, cmd)
-		if err != nil {
-			slog.Error("failed to register command", "command", cmd.Name, "error", err)
-		} else {
-			slog.Info("registered command", "command", cmd.Name)
-		}
+	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, guildID, commands)
+	if err != nil {
+		slog.Error("failed to register commands", "error", err)
+	} else {
+		slog.Info("registered commands", "count", len(commands))
 	}
 
 	go (func() {
