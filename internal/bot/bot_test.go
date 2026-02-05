@@ -252,15 +252,28 @@ func (m *MockTranslator) TranslateUsernames(ctx context.Context, usernames []str
 	return ret.Get(0).([]translation.Translation), ret.Error(1)
 }
 
+type MockMessageServer struct {
+	mock.Mock
+}
+
+func (m *MockMessageServer) SendMessage(ctx context.Context, job sendMessageJob) (*discordgo.Message, error) {
+	ret := m.Called(ctx, job)
+	if ret.Get(0) == nil {
+		return nil, ret.Error(1)
+	}
+	return ret.Get(0).(*discordgo.Message), ret.Error(1)
+}
+
 // Helper function to create a test bot
 func newTestBot(
 	log Logger,
 	session DiscordSession,
+	messageServer MessageServer,
 	repo db.Repository,
 	riotClient RiotClient,
 	translator Translator,
 ) *Bot {
-	return New(log, session, repo, riotClient, translator, Config{
+	return New(log, session, messageServer, repo, riotClient, translator, Config{
 		MaxSubscriptionsPerServer:    10,
 		EvaluateSubscriptionsTimeout: time.Minute,
 		EvalExpirationDuration:       10 * time.Minute,
@@ -278,11 +291,12 @@ func TestCleanupOldData(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSubLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		mockLogger.On("With", mock.Anything).Return(mockSubLogger)
 		mockSubLogger.On("InfoContext", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -301,11 +315,12 @@ func TestCleanupOldData(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSubLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		mockLogger.On("With", mock.Anything).Return(mockSubLogger)
 		mockRepo.On("DeleteEvals", mock.Anything, mock.Anything).Return(int64(0), errors.New("db error"))
@@ -324,21 +339,24 @@ func TestConsumeTranslationMessages(t *testing.T) {
 	t.Run("successful message send and db operations", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		job := sendMessageJob{
+			username:       "TestUser",
+			translations:   []translation.Translation{{Original: "테스트", Translated: "Test"}},
 			channelID:      "channel-123",
 			subscriptionID: 1,
 			gameID:         999,
-			message:        &discordgo.MessageEmbed{Title: "Test"},
 		}
 
-		mockSession.On("ChannelMessageSendComplex", "channel-123", mock.Anything, mock.Anything).
-			Return(&discordgo.Message{ID: "msg-456"}, nil)
+		mockMessageServer.On("SendMessage", mock.Anything, mock.MatchedBy(func(j sendMessageJob) bool {
+			return j.channelID == "channel-123" && j.subscriptionID == 1
+		})).Return(&discordgo.Message{ID: "msg-456"}, nil)
 
 		mockRepo.On("WithTx", mock.Anything, mock.Anything).Return(nil)
 		mockRepo.On("CreateEval", mock.Anything, mock.MatchedBy(func(params db.CreateEvalParams) bool {
@@ -353,60 +371,66 @@ func TestConsumeTranslationMessages(t *testing.T) {
 
 		err := bot.consumeTranslationMessages(ctx, job)
 		require.NoError(t, err)
-		mockSession.AssertExpectations(t)
+		mockMessageServer.AssertExpectations(t)
 		mockRepo.AssertExpectations(t)
 	})
 
 	t.Run("discord send error", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		job := sendMessageJob{
+			username:       "TestUser",
+			translations:   []translation.Translation{{Original: "테스트", Translated: "Test"}},
 			channelID:      "channel-123",
 			subscriptionID: 1,
 			gameID:         999,
-			message:        &discordgo.MessageEmbed{Title: "Test"},
 		}
 
-		mockSession.On("ChannelMessageSendComplex", "channel-123", mock.Anything, mock.Anything).
-			Return(nil, errors.New("discord error"))
+		mockMessageServer.On("SendMessage", mock.Anything, mock.MatchedBy(func(j sendMessageJob) bool {
+			return j.channelID == "channel-123" && j.subscriptionID == 1
+		})).Return(nil, errors.New("discord error"))
 
 		err := bot.consumeTranslationMessages(ctx, job)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "sending discord message")
-		mockSession.AssertExpectations(t)
+		mockMessageServer.AssertExpectations(t)
 	})
 
 	t.Run("transaction error", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		job := sendMessageJob{
+			username:       "TestUser",
+			translations:   []translation.Translation{{Original: "테스트", Translated: "Test"}},
 			channelID:      "channel-123",
 			subscriptionID: 1,
 			gameID:         999,
-			message:        &discordgo.MessageEmbed{Title: "Test"},
 		}
 
-		mockSession.On("ChannelMessageSendComplex", "channel-123", mock.Anything, mock.Anything).
-			Return(&discordgo.Message{ID: "msg-456"}, nil)
+		mockMessageServer.On("SendMessage", mock.Anything, mock.MatchedBy(func(j sendMessageJob) bool {
+			return j.channelID == "channel-123" && j.subscriptionID == 1
+		})).Return(&discordgo.Message{ID: "msg-456"}, nil)
 
 		mockRepo.On("WithTx", mock.Anything, mock.Anything).Return(errors.New("tx error"))
 
 		err := bot.consumeTranslationMessages(ctx, job)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "tx error")
-		mockSession.AssertExpectations(t)
+		mockMessageServer.AssertExpectations(t)
 		mockRepo.AssertExpectations(t)
 	})
 }
@@ -418,11 +442,12 @@ func TestProduceForServer(t *testing.T) {
 	t.Run("player in game with translations", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		subs := []db.Subscription{
 			{
@@ -470,11 +495,12 @@ func TestProduceForServer(t *testing.T) {
 	t.Run("player not in game", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		subs := []db.Subscription{
 			{
@@ -504,11 +530,12 @@ func TestProduceForServer(t *testing.T) {
 	t.Run("invalid username format", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		subs := []db.Subscription{
 			{
@@ -529,11 +556,12 @@ func TestProduceForServer(t *testing.T) {
 	t.Run("eval already exists", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		subs := []db.Subscription{
 			{
@@ -573,11 +601,12 @@ func TestHandleSubscribe(t *testing.T) {
 	t.Run("successful subscription", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -619,11 +648,12 @@ func TestHandleSubscribe(t *testing.T) {
 	t.Run("subscription limit reached", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -650,11 +680,12 @@ func TestHandleSubscribe(t *testing.T) {
 	t.Run("invalid riot account", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -692,11 +723,12 @@ func TestHandleUnsubscribe(t *testing.T) {
 	t.Run("successful unsubscription", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -729,11 +761,12 @@ func TestHandleUnsubscribe(t *testing.T) {
 	t.Run("subscription not found", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -766,11 +799,12 @@ func TestHandleListForChannel(t *testing.T) {
 	t.Run("list subscriptions", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{
@@ -796,11 +830,12 @@ func TestHandleListForChannel(t *testing.T) {
 	t.Run("no subscriptions", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
 		mockRepo := new(MockRepository)
 		mockRiot := new(MockRiotClient)
 		mockTranslator := new(MockTranslator)
 
-		bot := newTestBot(mockLogger, mockSession, mockRepo, mockRiot, mockTranslator)
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
 
 		interaction := &discordgo.InteractionCreate{
 			Interaction: &discordgo.Interaction{

@@ -142,9 +142,11 @@ func mainE() error {
 	riotClient := riot.NewCachedClient(*riotAPIKey, repo)
 	log.InfoContext(ctx, "riot API client initialized with caching")
 
+	discordSession := bot.NewDiscordSession(dg)
 	b := bot.New(
 		bot.NewLogger(log),
-		bot.NewDiscordSession(dg),
+		discordSession,
+		bot.NewMessageServer(discordSession),
 		repo,
 		bot.NewRiotClient(riotClient),
 		bot.NewTranslator(translator),

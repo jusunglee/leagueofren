@@ -29,29 +29,32 @@ type Config struct {
 }
 
 type Bot struct {
-	log        Logger
-	session    DiscordSession
-	repo       db.Repository
-	riotClient RiotClient
-	translator Translator
-	config     Config
+	log           Logger
+	session       DiscordSession
+	messageServer MessageServer
+	repo          db.Repository
+	riotClient    RiotClient
+	translator    Translator
+	config        Config
 }
 
 func New(
 	log Logger,
 	session DiscordSession,
+	messageServer MessageServer,
 	repo db.Repository,
 	riotClient RiotClient,
 	translator Translator,
 	config Config,
 ) *Bot {
 	return &Bot{
-		log:        log,
-		session:    session,
-		repo:       repo,
-		riotClient: riotClient,
-		translator: translator,
-		config:     config,
+		log:           log,
+		session:       session,
+		messageServer: messageServer,
+		repo:          repo,
+		riotClient:    riotClient,
+		translator:    translator,
+		config:        config,
 	}
 }
 
@@ -558,7 +561,8 @@ func (b *Bot) respond(s *discordgo.Session, i *discordgo.InteractionCreate, cont
 }
 
 type sendMessageJob struct {
-	message        *discordgo.MessageEmbed
+	username       string
+	translations   []translation.Translation
 	subscriptionID int64
 	channelID      string
 	gameID         int64
@@ -631,9 +635,9 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 				return nil
 			}
 
-			embed := formatTranslationEmbed(sub.LolUsername, translations)
 			jobs = append(jobs, sendMessageJob{
-				message:        embed,
+				username:       sub.LolUsername,
+				translations:   translations,
 				channelID:      sub.DiscordChannelID,
 				subscriptionID: sub.ID,
 				gameID:         game.GameID,
@@ -651,25 +655,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 }
 
 func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob) error {
-	msg, err := b.session.ChannelMessageSendComplex(job.channelID, &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{job.message},
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label:    "Good ✓",
-						CustomID: "feedback_good",
-						Style:    discordgo.SuccessButton,
-					},
-					discordgo.Button{
-						Label:    "Suggest Fix",
-						CustomID: "feedback_fix",
-						Style:    discordgo.SecondaryButton,
-					},
-				},
-			},
-		},
-	})
+	msg, err := b.messageServer.SendMessage(ctx, job)
 	if err != nil {
 		return fmt.Errorf("sending discord message: %w", err)
 	}
@@ -744,6 +730,7 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	return jobs, err
 }
 
+// TODO: Only supports korean and chinese so far, make the language a user-passed flag.
 func containsForeignCharacters(s string) bool {
 	for _, r := range s {
 		if unicode.Is(unicode.Han, r) {
@@ -754,41 +741,6 @@ func containsForeignCharacters(s string) bool {
 		}
 	}
 	return false
-}
-
-func formatTranslationEmbed(username string, translations []translation.Translation) *discordgo.MessageEmbed {
-	const maxInlineEntries = 8
-	fields := make([]*discordgo.MessageEmbedField, 0, 25)
-
-	inlineCount := min(len(translations), maxInlineEntries)
-	for i := 0; i < inlineCount; i++ {
-		t := translations[i]
-		fields = append(fields,
-			&discordgo.MessageEmbedField{Name: "Original", Value: t.Original, Inline: true},
-			&discordgo.MessageEmbedField{Name: "Translation", Value: t.Translated, Inline: true},
-		)
-		if i < inlineCount-1 {
-			fields = append(fields, &discordgo.MessageEmbedField{Name: "\u200b", Value: "\u200b", Inline: false})
-		}
-	}
-
-	if len(translations) > maxInlineEntries {
-		var sb strings.Builder
-		for _, t := range translations[maxInlineEntries:] {
-			sb.WriteString(fmt.Sprintf("**%s** → %s\n", t.Original, t.Translated))
-		}
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:  "\u200b",
-			Value: sb.String(),
-		})
-	}
-
-	return &discordgo.MessageEmbed{
-		Title:       fmt.Sprintf("%s is in a game!", username),
-		Color:       0x5865F2,
-		Description: "Translations for players in this match:",
-		Fields:      fields,
-	}
 }
 
 func (b *Bot) cleanupOldData(ctx context.Context) error {
