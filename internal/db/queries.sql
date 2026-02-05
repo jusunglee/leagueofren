@@ -14,6 +14,17 @@ SELECT * FROM evals
 WHERE game_id = $1 AND subscription_id = $2
 LIMIT 1;
 
+-- name: DeleteEvals :execrows
+DELETE FROM evals
+WHERE evaluated_at < $1;
+
+-- name: FindSubscriptionsWithExpiredNewestOnlineEval :many
+SELECT subscription_id, MAX(evaluated_at) as newest_online_eval
+FROM evals
+WHERE eval_status != 'OFFLINE'
+GROUP BY subscription_id
+HAVING MAX(evaluated_at) < $1;
+
 -- name: GetSubscriptionsByChannel :many
 SELECT * FROM subscriptions
 WHERE discord_channel_id = $1
@@ -31,6 +42,10 @@ WHERE id = $1;
 -- name: DeleteSubscription :execrows
 DELETE FROM subscriptions
 WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3;
+
+-- name: DeleteSubscriptions :execrows
+DELETE FROM subscriptions
+WHERE id=ANY($1::bigint[]);
 
 -- name: UpdateSubscriptionLastEvaluatedAt :exec
 UPDATE subscriptions

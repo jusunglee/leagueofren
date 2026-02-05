@@ -28,12 +28,15 @@ import (
 )
 
 type Bot struct {
+	log                          *slog.Logger
 	session                      *discordgo.Session
 	queries                      *db.Queries
 	riotClient                   *riot.CachedClient
 	translator                   *translation.Translator
 	maxSubscriptionsPerServer    int64
 	evaluateSubscriptionsTimeout time.Duration
+	evalExpirationDuration       time.Duration
+	offlineActivityThreshold     time.Duration
 }
 
 func buildRegionChoices() []*discordgo.ApplicationCommandOptionChoice {
@@ -94,41 +97,42 @@ var commands = []*discordgo.ApplicationCommand{
 
 func main() {
 	_ = godotenv.Load()
-	logger.Init()
+	log := logger.New()
+	ctx := context.Background()
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		slog.Error("DATABASE_URL environment variable is required")
+		log.ErrorContext(ctx, "DATABASE_URL environment variable is required")
 		os.Exit(1)
 	}
 
 	discordToken := os.Getenv("DISCORD_TOKEN")
 	if discordToken == "" {
-		slog.Error("DISCORD_TOKEN environment variable is required")
+		log.ErrorContext(ctx, "DISCORD_TOKEN environment variable is required")
 		os.Exit(1)
 	}
 
 	riotAPIKey := os.Getenv("RIOT_API_KEY")
 	if riotAPIKey == "" {
-		slog.Error("RIOT_API_KEY environment variable is required")
+		log.ErrorContext(ctx, "RIOT_API_KEY environment variable is required")
 		os.Exit(1)
 	}
 
 	provider := os.Getenv("LLM_PROVIDER")
 	if provider == "" {
-		slog.Error("LLM_PROVIDER environment variable is required")
+		log.ErrorContext(ctx, "LLM_PROVIDER environment variable is required")
 		os.Exit(1)
 	}
 
 	model := os.Getenv("LLM_MODEL")
 	if model == "" {
-		slog.Error("LLM_MODEL environment variable is required")
+		log.ErrorContext(ctx, "LLM_MODEL environment variable is required")
 		os.Exit(1)
 	}
 
 	guildID := os.Getenv("DISCORD_GUILD_ID")
 	if guildID == "" {
-		slog.Error("DISCORD_GUILD_ID environment variable is required")
+		log.ErrorContext(ctx, "DISCORD_GUILD_ID environment variable is required")
 		os.Exit(1)
 	}
 
@@ -138,7 +142,7 @@ func main() {
 	}
 	maxSubscriptionsPerServer, err := strconv.ParseInt(maxSubscriptionsPerServerStr, 10, 64)
 	if err != nil {
-		slog.Error("MAX_SUBSCRIPTIONS_PER_SERVER environment variable is not a valid integer", "error", err)
+		log.ErrorContext(ctx, "MAX_SUBSCRIPTIONS_PER_SERVER environment variable is not a valid integer", "error", err)
 		os.Exit(1)
 	}
 
@@ -148,21 +152,31 @@ func main() {
 	}
 	evaluateSubscriptionsTimeout, err := time.ParseDuration(evaluateSubscriptionsTimeoutStr)
 	if err != nil {
-		slog.Error("EVALUATE_SUBSCRIPTIONS_TIMEOUT environment variable is not a valid duration", "error", err)
+		log.ErrorContext(ctx, "EVALUATE_SUBSCRIPTIONS_TIMEOUT environment variable is not a valid duration", "error", err)
 		os.Exit(1)
 	}
-	ctx := context.Background()
 
-	pool, err := db.NewPool(ctx, databaseURL)
+	evalExpirationDurationStr := os.Getenv("EVAL_EXPIRATION_DURATION")
+	if evalExpirationDurationStr == "" {
+		evalExpirationDurationStr = "504h" // 3 weeks
+	}
+	evalExpirationDuration, err := time.ParseDuration(evalExpirationDurationStr)
 	if err != nil {
-		slog.Error("failed to create connection pool", "error", err)
+		log.ErrorContext(ctx, "EVAL_EXPIRATION_DURATION environment variable is not a valid duration", "error", err)
 		os.Exit(1)
 	}
-	defer pool.Close()
-	slog.Info("connected to database")
+
+	offlineActivityThresholdStr := os.Getenv("OFFLINE_ACTIVITY_THRESHOLD")
+	if offlineActivityThresholdStr == "" {
+		offlineActivityThresholdStr = "168h" // 1 week
+	}
+	offlineActivityThreshold, err := time.ParseDuration(offlineActivityThresholdStr)
+	if err != nil {
+		log.ErrorContext(ctx, "OFFLINE_ACTIVITY_THRESHOLD environment variable is not a valid duration", "error", err)
+		os.Exit(1)
+	}
 
 	var client llm.Client
-
 	switch provider {
 	case "anthropic":
 		apiKey := os.Getenv("ANTHROPIC_API_KEY")
@@ -189,74 +203,96 @@ func main() {
 
 	dg, err := discordgo.New("Bot " + discordToken)
 	if err != nil {
-		slog.Error("failed to create Discord session", "error", err)
+		log.ErrorContext(ctx, "failed to create Discord session", "error", err)
 		os.Exit(1)
 	}
+
+	pool, err := db.NewPool(ctx, databaseURL)
+	if err != nil {
+		log.ErrorContext(ctx, "failed to create connection pool", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+	log.InfoContext(ctx, "connected to database")
 
 	queries := db.New(pool)
 	translator := translation.NewTranslator(client, queries, provider, model)
 
 	bot := &Bot{
+		log:                          log,
 		session:                      dg,
 		queries:                      queries,
 		riotClient:                   riot.NewCachedClient(riotAPIKey, queries),
 		translator:                   translator,
 		maxSubscriptionsPerServer:    maxSubscriptionsPerServer,
 		evaluateSubscriptionsTimeout: evaluateSubscriptionsTimeout,
+		evalExpirationDuration:       evalExpirationDuration,
+		offlineActivityThreshold:     offlineActivityThreshold,
 	}
-	slog.Info("riot API client initialized with caching")
+	log.InfoContext(ctx, "riot API client initialized with caching")
 
 	dg.AddHandler(bot.handleInteraction)
 	dg.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		slog.Info("connected to Discord", "username", r.User.Username, "discriminator", r.User.Discriminator)
+		log.InfoContext(ctx, "connected to Discord", "username", r.User.Username, "discriminator", r.User.Discriminator)
 	})
 
 	err = dg.Open()
 	if err != nil {
-		slog.Error("failed to open Discord connection", "error", err)
+		log.ErrorContext(ctx, "failed to open Discord connection", "error", err)
 		os.Exit(1)
 	}
 	defer dg.Close()
 
 	if guildID != "" {
-		slog.Info("registering commands to guild", "guild_id", guildID)
-		// Clear any stale global commands
+		log.InfoContext(ctx, "registering commands to guild", "guild_id", guildID)
 		_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", []*discordgo.ApplicationCommand{})
 		if err != nil {
-			slog.Warn("failed to clear global commands", "error", err)
+			log.WarnContext(ctx, "failed to clear global commands", "error", err)
 		} else {
-			slog.Info("cleared global commands")
+			log.InfoContext(ctx, "cleared global commands")
 		}
 	} else {
-		slog.Info("registering commands globally (may take up to 1 hour to propagate)")
+		log.InfoContext(ctx, "registering commands globally (may take up to 1 hour to propagate)")
 	}
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, guildID, commands)
 	if err != nil {
-		slog.Error("failed to register commands", "error", err)
+		log.ErrorContext(ctx, "failed to register commands", "error", err)
 	} else {
-		slog.Info("registered commands", "count", len(commands))
+		log.InfoContext(ctx, "registered commands", "count", len(commands))
 	}
 
 	go (func() {
 		for {
-			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			evalCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 			defer cancel()
-			err := bot.evaluateSubscriptions(ctx)
+			err := bot.evaluateSubscriptions(evalCtx)
 			if err != nil {
-				slog.Error("running eval", "error", err)
+				log.ErrorContext(evalCtx, "running eval", "error", err)
 			}
 			time.Sleep(time.Minute)
 		}
 	})()
 
-	slog.Info("bot is running, press Ctrl+C to stop")
+	go (func() {
+		for {
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			defer cancel()
+			err := bot.cleanupOldData(ctx)
+			if err != nil {
+				log.Error("deleting old data", "error", err)
+			}
+			time.Sleep(time.Hour)
+		}
+	})()
+
+	log.InfoContext(ctx, "bot is running, press Ctrl+C to stop")
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	slog.Info("shutting down")
+	log.InfoContext(ctx, "shutting down")
 }
 
 type HandlerResult struct {
@@ -276,6 +312,8 @@ func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 }
 
 func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 	var result HandlerResult
 	cmd := i.ApplicationCommandData().Name
 
@@ -288,7 +326,7 @@ func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate
 		result = b.handleListForChannel(i)
 	}
 
-	respond(s, i, result.Response)
+	b.respond(s, i, result.Response)
 
 	if result.Err == nil {
 		return
@@ -296,25 +334,27 @@ func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	if _, ok := errors.AsType[*UserError](result.Err); ok {
 		if os.Getenv("DISCORD_GUILD_ID") != "" {
-			slog.Warn("user error", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
+			b.log.WarnContext(ctx, "user error", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
 		}
 	} else {
-		slog.Error("command failed", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
+		b.log.ErrorContext(ctx, "command failed", "command", cmd, "error", result.Err, "channel_id", i.ChannelID)
 	}
 }
 
 func (b *Bot) handleComponent(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 	customID := i.MessageComponentData().CustomID
 	messageID := i.Message.ID
 
 	switch customID {
 	case "feedback_good":
-		_, err := b.queries.CreateFeedback(context.Background(), db.CreateFeedbackParams{
+		_, err := b.queries.CreateFeedback(ctx, db.CreateFeedbackParams{
 			DiscordMessageID: messageID,
 			FeedbackText:     "👍",
 		})
 		if err != nil {
-			slog.Error("failed to store positive feedback", "error", err, "message_id", messageID)
+			b.log.ErrorContext(ctx, "failed to store positive feedback", "error", err, "message_id", messageID)
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -350,6 +390,8 @@ func (b *Bot) handleComponent(s *discordgo.Session, i *discordgo.InteractionCrea
 }
 
 func (b *Bot) handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 	data := i.ModalSubmitData()
 
 	parts := strings.Split(data.CustomID, ":")
@@ -369,12 +411,12 @@ func (b *Bot) handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCr
 		}
 	}
 
-	_, err := b.queries.CreateFeedback(context.Background(), db.CreateFeedbackParams{
+	_, err := b.queries.CreateFeedback(ctx, db.CreateFeedbackParams{
 		DiscordMessageID: messageID,
 		FeedbackText:     correctionText,
 	})
 	if err != nil {
-		slog.Error("failed to store correction feedback", "error", err, "message_id", messageID)
+		b.log.ErrorContext(ctx, "failed to store correction feedback", "error", err, "message_id", messageID)
 	}
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -478,8 +520,8 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 		}
 	}
 
-	slog.Info("subscription created", "username", canonicalName, "region", region, "channel_id", channelID)
-	return HandlerResult{Response: fmt.Sprintf("✅ Subscribed to **%s** (%s)!", canonicalName, region)}
+	b.log.InfoContext(ctx, "subscription created", "username", canonicalName, "region", region, "channel_id", channelID)
+	return HandlerResult{Response: fmt.Sprintf("✅ Subscribed to **%s** (%s)! Will autounsubscribe after 3 weeks of no gameplay.", canonicalName, region)}
 }
 
 func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
@@ -519,7 +561,7 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 		}
 	}
 
-	slog.Info("subscription deleted", "username", canonicalName, "region", region, "channel_id", channelID)
+	b.log.InfoContext(ctx, "subscription deleted", "username", canonicalName, "region", region, "channel_id", channelID)
 	return HandlerResult{Response: fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", canonicalName, region)}
 }
 
@@ -547,7 +589,9 @@ func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) HandlerResult
 	return HandlerResult{Response: content}
 }
 
-func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+func (b *Bot) respond(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -555,19 +599,17 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 		},
 	})
 	if err != nil {
-		slog.Error("failed to respond to interaction", "error", err)
+		b.log.ErrorContext(ctx, "failed to respond to interaction", "error", err)
 	}
 }
 
 func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), b.evaluateSubscriptionsTimeout)
-	defer cancel()
-	slog.Info("starting eval loop...")
+	b.log.InfoContext(ctx, "starting eval loop...")
 	subs, err := b.queries.GetAllSubscriptions(ctx, 1000)
 	if err != nil {
 		return fmt.Errorf("getting all subscriptions %w", err)
 	}
-	slog.Info("subscriptions", "subs", subs, "err", err)
+	b.log.InfoContext(ctx, "subscriptions", "subs", subs, "err", err)
 
 	servers := lo.GroupBy(subs, func(s db.Subscription) string {
 		return s.ServerID
@@ -587,7 +629,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 
 			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
 			if errors.Is(err, riot.ErrNotInGame) {
-				slog.Info("user not in game", "username", sub.LolUsername, "region", sub.Region)
+				b.log.InfoContext(ctx, "user not in game", "username", sub.LolUsername, "region", sub.Region)
 				continue
 			}
 			if err != nil {
@@ -601,7 +643,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				})
 
 			if !errors.Is(err, pgx.ErrNoRows) {
-				slog.Info("game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
+				b.log.InfoContext(ctx, "game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
 				continue
 			}
 
@@ -615,7 +657,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 			})
 
 			if len(names) == 0 {
-				slog.Info("no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
+				b.log.InfoContext(ctx, "no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
 				continue
 			}
 
@@ -664,7 +706,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				return fmt.Errorf("updating subscription last evaluated at: %w", err)
 			}
 
-			slog.Info("sent translation message",
+			b.log.InfoContext(ctx, "sent translation message",
 				"subscription_id", sub.ID,
 				"channel_id", sub.DiscordChannelID,
 				"game_id", game.GameID,
@@ -672,7 +714,7 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Done evaluating subscriptions", "num_subs", len(subs))
+	b.log.InfoContext(ctx, "Done evaluating subscriptions", "num_subs", len(subs))
 	return nil
 }
 
@@ -723,7 +765,39 @@ func formatTranslationEmbed(username string, translations []translation.Translat
 	}
 }
 
-// TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
+func (b *Bot) cleanupOldData(ctx context.Context) error {
+	log := b.log.With("subsystem", "cleanup_old_data")
+	// 1. Delete all evals older than a month
+	rows, err := b.queries.DeleteEvals(ctx, pgtype.Timestamptz{Valid: true, Time: time.Now().Add(-b.evalExpirationDuration)})
+	if err != nil {
+		return fmt.Errorf("deleting old evals: %w", err)
+	}
+	log.InfoContext(ctx, "Deleted rows", slog.Int64("rows", rows))
+
+	// 2. Find subs where their newest non-offline eval is older than 2 weeks
+	subs, err := b.queries.FindSubscriptionsWithExpiredNewestOnlineEval(ctx, pgtype.Timestamptz{Valid: true, Time: time.Now().Add(-b.offlineActivityThreshold)})
+	if len(subs) == 0 {
+		log.InfoContext(ctx, "No expired subs")
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("retrieving expired subscriptions: %w", err)
+	}
+
+	// 3. Delete these subscriptions
+	subIds := lo.Map(subs, func(s db.FindSubscriptionsWithExpiredNewestOnlineEvalRow, _ int) int64 {
+		return s.SubscriptionID
+	})
+	count, err := b.queries.DeleteSubscriptions(ctx, subIds)
+	if err != nil {
+		return fmt.Errorf("deleting expired subs: %w", err)
+	}
+	log.InfoContext(ctx, "deleted expired subs", slog.Int64("deleted_subs_count", count))
+
+	return nil
+}
+
+// TODO: Support dockerization because I know people would want to run this on their local windows while also playing league
 // TODO: Support ignore lists
 // TODO: metrics into grafana/loki
 // TODO: Coalesce same party-channel-server results into the same message, and ignore them

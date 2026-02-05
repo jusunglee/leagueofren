@@ -306,3 +306,4 @@ Design a Bubbletea TUI setup tool for this Go project.
 2026-02-04 23:34:00 - User: Allow users to Ctrl C out of it
 2026-02-04 23:46:33 - User: In the input prompt for the discord section, the input field should have a label, paste the token from step x here
 2026-02-04 23:52:53 - User: edit the other input prompts so that it's clear what the user is supposed to paste in
+replace all log.Info or Warn or Error with the context version

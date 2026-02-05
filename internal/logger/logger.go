@@ -9,21 +9,13 @@ import (
 	"sync"
 )
 
-var (
-	once   sync.Once
-	logger *slog.Logger
-)
-
 const (
-	reset   = "\033[0m"
-	red     = "\033[31m"
-	green   = "\033[32m"
-	yellow  = "\033[33m"
-	blue    = "\033[34m"
-	magenta = "\033[35m"
-	cyan    = "\033[36m"
-	gray    = "\033[90m"
-	white   = "\033[97m"
+	reset  = "\033[0m"
+	red    = "\033[31m"
+	green  = "\033[32m"
+	yellow = "\033[33m"
+	cyan   = "\033[36m"
+	gray   = "\033[90m"
 )
 
 type PrettyHandler struct {
@@ -85,53 +77,26 @@ func (h *PrettyHandler) WithGroup(name string) slog.Handler {
 	return h
 }
 
-func Init() *slog.Logger {
-	once.Do(func() {
-		format := os.Getenv("LOG_FORMAT")
-		levelStr := os.Getenv("LOG_LEVEL")
+func New() *slog.Logger {
+	format := os.Getenv("LOG_FORMAT")
+	levelStr := os.Getenv("LOG_LEVEL")
 
-		level := slog.LevelInfo
-		switch levelStr {
-		case "debug":
-			level = slog.LevelDebug
-		case "warn":
-			level = slog.LevelWarn
-		case "error":
-			level = slog.LevelError
-		}
-
-		var handler slog.Handler
-		if format == "json" {
-			handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
-		} else {
-			handler = NewPrettyHandler(os.Stdout, level)
-		}
-
-		logger = slog.New(handler)
-		slog.SetDefault(logger)
-	})
-	return logger
-}
-
-func Get() *slog.Logger {
-	if logger == nil {
-		return Init()
+	level := slog.LevelInfo
+	switch levelStr {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
 	}
-	return logger
-}
 
-func Info(msg string, args ...any) {
-	Get().Info(msg, args...)
-}
+	var handler slog.Handler
+	if format == "json" {
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	} else {
+		handler = NewPrettyHandler(os.Stdout, level)
+	}
 
-func Error(msg string, args ...any) {
-	Get().Error(msg, args...)
-}
-
-func Warn(msg string, args ...any) {
-	Get().Warn(msg, args...)
-}
-
-func Debug(msg string, args ...any) {
-	Get().Debug(msg, args...)
+	return slog.New(handler)
 }

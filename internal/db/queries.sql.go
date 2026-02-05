@@ -212,6 +212,19 @@ func (q *Queries) CreateTranslationToEval(ctx context.Context, arg CreateTransla
 	return err
 }
 
+const deleteEvals = `-- name: DeleteEvals :execrows
+DELETE FROM evals
+WHERE evaluated_at < $1
+`
+
+func (q *Queries) DeleteEvals(ctx context.Context, evaluatedAt pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteEvals, evaluatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteExpiredAccountCache = `-- name: DeleteExpiredAccountCache :exec
 DELETE FROM riot_account_cache WHERE expires_at < NOW()
 `
@@ -248,6 +261,52 @@ func (q *Queries) DeleteSubscription(ctx context.Context, arg DeleteSubscription
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteSubscriptions = `-- name: DeleteSubscriptions :execrows
+DELETE FROM subscriptions
+WHERE id=ANY($1::bigint[])
+`
+
+func (q *Queries) DeleteSubscriptions(ctx context.Context, dollar_1 []int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSubscriptions, dollar_1)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const findSubscriptionsWithExpiredNewestOnlineEval = `-- name: FindSubscriptionsWithExpiredNewestOnlineEval :many
+SELECT subscription_id, MAX(evaluated_at) as newest_online_eval
+FROM evals
+WHERE eval_status != "OFFLINE"
+GROUP BY subscription_id
+HAVING MAX(evaluated_at) < $1
+`
+
+type FindSubscriptionsWithExpiredNewestOnlineEvalRow struct {
+	SubscriptionID   int64       `json:"subscription_id"`
+	NewestOnlineEval interface{} `json:"newest_online_eval"`
+}
+
+func (q *Queries) FindSubscriptionsWithExpiredNewestOnlineEval(ctx context.Context, evaluatedAt pgtype.Timestamptz) ([]FindSubscriptionsWithExpiredNewestOnlineEvalRow, error) {
+	rows, err := q.db.Query(ctx, findSubscriptionsWithExpiredNewestOnlineEval, evaluatedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindSubscriptionsWithExpiredNewestOnlineEvalRow{}
+	for rows.Next() {
+		var i FindSubscriptionsWithExpiredNewestOnlineEvalRow
+		if err := rows.Scan(&i.SubscriptionID, &i.NewestOnlineEval); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAllSubscriptions = `-- name: GetAllSubscriptions :many
