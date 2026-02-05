@@ -681,4 +681,6 @@ func formatTranslationEmbed(username string, translations []translation.Translat
 }
 
 // TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
-// Limit
+// TODO: Limit subscriptions per server
+// TODO: Support ignore lists
+// TODO: metrics into grafana/loki
