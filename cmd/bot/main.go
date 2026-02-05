@@ -52,7 +52,7 @@ func mainE() error {
 		if !completed {
 			return errors.New("setup cancelled")
 		}
-		fmt.Println("\nConfiguration saved! Starting bot...\n")
+		fmt.Println("\nConfiguration saved! Starting bot...")
 	}
 
 	_ = godotenv.Load()
