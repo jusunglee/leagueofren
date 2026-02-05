@@ -25,6 +25,7 @@ var ValidRegions = []string{
 	"OCE",
 	"TR",
 	"RU",
+	"TW",
 }
 
 var regionToRoutingURL = map[string]string{
@@ -39,6 +40,7 @@ var regionToRoutingURL = map[string]string{
 	"KR":   "https://asia.api.riotgames.com",
 	"JP":   "https://asia.api.riotgames.com",
 	"OCE":  "https://sea.api.riotgames.com",
+	"TW":   "https://asia.api.riotgames.com",
 }
 
 var regionToPlatformURL = map[string]string{
@@ -53,6 +55,7 @@ var regionToPlatformURL = map[string]string{
 	"KR":   "https://kr.api.riotgames.com",
 	"JP":   "https://jp1.api.riotgames.com",
 	"OCE":  "https://oc1.api.riotgames.com",
+	"TW":   "https://tw2.api.riotgames.com",
 }
 
 type Account struct {
