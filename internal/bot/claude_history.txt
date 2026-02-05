@@ -1,0 +1,1 @@
+Create a code coverage test for the bot package.
