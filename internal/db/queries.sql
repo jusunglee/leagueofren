@@ -1,6 +1,6 @@
 -- name: CreateSubscription :one
-INSERT INTO subscriptions (discord_channel_id, lol_username, region)
-VALUES ($1, $2, $3)
+INSERT INTO subscriptions (discord_channel_id, lol_username, region, server_id)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
 RETURNING *;
 
@@ -18,6 +18,11 @@ LIMIT 1;
 SELECT * FROM subscriptions
 WHERE discord_channel_id = $1
 ORDER BY created_at DESC;
+
+-- name: CountSubscriptionsByServer :one
+SELECT COUNT(*)
+FROM subscriptions
+WHERE server_id = $1;
 
 -- name: GetSubscriptionByID :one
 SELECT * FROM subscriptions

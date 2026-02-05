@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -27,10 +28,12 @@ import (
 )
 
 type Bot struct {
-	session    *discordgo.Session
-	queries    *db.Queries
-	riotClient *riot.CachedClient
-	translator *translation.Translator
+	session                      *discordgo.Session
+	queries                      *db.Queries
+	riotClient                   *riot.CachedClient
+	translator                   *translation.Translator
+	maxSubscriptionsPerServer    int64
+	evaluateSubscriptionsTimeout time.Duration
 }
 
 func buildRegionChoices() []*discordgo.ApplicationCommandOptionChoice {
@@ -129,6 +132,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	maxSubscriptionsPerServerStr := os.Getenv("MAX_SUBSCRIPTIONS_PER_SERVER")
+	if maxSubscriptionsPerServerStr == "" {
+		maxSubscriptionsPerServerStr = "10"
+	}
+	maxSubscriptionsPerServer, err := strconv.ParseInt(maxSubscriptionsPerServerStr, 10, 64)
+	if err != nil {
+		slog.Error("MAX_SUBSCRIPTIONS_PER_SERVER environment variable is not a valid integer", "error", err)
+		os.Exit(1)
+	}
+
+	evaluateSubscriptionsTimeoutStr := os.Getenv("EVALUATE_SUBSCRIPTIONS_TIMEOUT")
+	if evaluateSubscriptionsTimeoutStr == "" {
+		evaluateSubscriptionsTimeoutStr = "1m"
+	}
+	evaluateSubscriptionsTimeout, err := time.ParseDuration(evaluateSubscriptionsTimeoutStr)
+	if err != nil {
+		slog.Error("EVALUATE_SUBSCRIPTIONS_TIMEOUT environment variable is not a valid duration", "error", err)
+		os.Exit(1)
+	}
 	ctx := context.Background()
 
 	pool, err := db.NewPool(ctx, databaseURL)
@@ -175,10 +197,12 @@ func main() {
 	translator := translation.NewTranslator(client, queries, provider, model)
 
 	bot := &Bot{
-		session:    dg,
-		queries:    queries,
-		riotClient: riot.NewCachedClient(riotAPIKey, queries),
-		translator: translator,
+		session:                      dg,
+		queries:                      queries,
+		riotClient:                   riot.NewCachedClient(riotAPIKey, queries),
+		translator:                   translator,
+		maxSubscriptionsPerServer:    maxSubscriptionsPerServer,
+		evaluateSubscriptionsTimeout: evaluateSubscriptionsTimeout,
 	}
 	slog.Info("riot API client initialized with caching")
 
@@ -392,6 +416,17 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 	username := getOption(options, "username")
 	region := getOption(options, "region")
 	channelID := i.ChannelID
+	serverID := i.GuildID
+	// TODO: Probably need to handle this better, it's a shame that discordgo doesn't have context built into interactions
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	count, err := b.queries.CountSubscriptionsByServer(ctx, serverID)
+	if count > b.maxSubscriptionsPerServer {
+		return HandlerResult{
+			Response: "❌ Already at maxium subscription count per server, please /unsubscribe to some before subscribing to more.",
+		}
+	}
 
 	gameName, tagLine, err := riot.ParseRiotID(username)
 	if err != nil {
@@ -408,7 +443,7 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 		}
 	}
 
-	account, err := b.riotClient.GetAccountByRiotID(context.Background(), gameName, tagLine, region)
+	account, err := b.riotClient.GetAccountByRiotID(ctx, gameName, tagLine, region)
 	if errors.Is(err, riot.ErrNotFound) {
 		return HandlerResult{
 			Response: fmt.Sprintf("❌ Summoner **%s#%s** not found in **%s**", gameName, tagLine, region),
@@ -424,10 +459,11 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) HandlerResult {
 
 	canonicalName := fmt.Sprintf("%s#%s", account.GameName, account.TagLine)
 
-	_, err = b.queries.CreateSubscription(context.Background(), db.CreateSubscriptionParams{
+	_, err = b.queries.CreateSubscription(ctx, db.CreateSubscriptionParams{
 		DiscordChannelID: channelID,
 		LolUsername:      canonicalName,
 		Region:           region,
+		ServerID:         serverID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return HandlerResult{
@@ -452,6 +488,9 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 	region := getOption(options, "region")
 	channelID := i.ChannelID
 
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
 	gameName, tagLine, err := riot.ParseRiotID(username)
 	if err != nil {
 		return HandlerResult{
@@ -462,7 +501,7 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 
 	canonicalName := fmt.Sprintf("%s#%s", gameName, tagLine)
 
-	rowsAffected, err := b.queries.DeleteSubscription(context.Background(), db.DeleteSubscriptionParams{
+	rowsAffected, err := b.queries.DeleteSubscription(ctx, db.DeleteSubscriptionParams{
 		DiscordChannelID: channelID,
 		LolUsername:      canonicalName,
 		Region:           region,
@@ -485,9 +524,11 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) HandlerResult {
 }
 
 func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) HandlerResult {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 	channelID := i.ChannelID
 
-	subs, err := b.queries.GetSubscriptionsByChannel(context.Background(), channelID)
+	subs, err := b.queries.GetSubscriptionsByChannel(ctx, channelID)
 	if err != nil {
 		return HandlerResult{
 			Response: "❌ Failed to list subscriptions. Please try again later.",
@@ -519,15 +560,17 @@ func respond(s *discordgo.Session, i *discordgo.InteractionCreate, content strin
 }
 
 func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), b.evaluateSubscriptionsTimeout)
+	defer cancel()
 	slog.Info("starting eval loop...")
-	subs, err := b.queries.GetAllSubscriptions(context.Background(), 1000)
+	subs, err := b.queries.GetAllSubscriptions(ctx, 1000)
 	if err != nil {
 		return fmt.Errorf("getting all subscriptions %w", err)
 	}
 	slog.Info("subscriptions", "subs", subs, "err", err)
 
 	servers := lo.GroupBy(subs, func(s db.Subscription) string {
-		return s.ServerID.String
+		return s.ServerID
 	})
 	for _, subs := range servers {
 		for _, sub := range subs {
@@ -681,6 +724,6 @@ func formatTranslationEmbed(username string, translations []translation.Translat
 }
 
 // TODO: job to auto delete subscriptions not positively eval'd in 2 weeks
-// TODO: Limit subscriptions per server
 // TODO: Support ignore lists
 // TODO: metrics into grafana/loki
+// TODO: Coalesce same party-channel-server results into the same message, and ignore them

@@ -61,6 +61,19 @@ func (q *Queries) CacheGameStatus(ctx context.Context, arg CacheGameStatusParams
 	return err
 }
 
+const countSubscriptionsByServer = `-- name: CountSubscriptionsByServer :one
+SELECT COUNT(*)
+FROM subscriptions
+WHERE server_id = $1
+`
+
+func (q *Queries) CountSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countSubscriptionsByServer, serverID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEval = `-- name: CreateEval :one
 INSERT INTO evals (subscription_id, eval_status, discord_message_id, game_id)
 VALUES ($1, $2, $3, $4)
@@ -117,8 +130,8 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 }
 
 const createSubscription = `-- name: CreateSubscription :one
-INSERT INTO subscriptions (discord_channel_id, lol_username, region)
-VALUES ($1, $2, $3)
+INSERT INTO subscriptions (discord_channel_id, lol_username, region, server_id)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
 RETURNING id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 `
@@ -127,10 +140,16 @@ type CreateSubscriptionParams struct {
 	DiscordChannelID string `json:"discord_channel_id"`
 	LolUsername      string `json:"lol_username"`
 	Region           string `json:"region"`
+	ServerID         string `json:"server_id"`
 }
 
 func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error) {
-	row := q.db.QueryRow(ctx, createSubscription, arg.DiscordChannelID, arg.LolUsername, arg.Region)
+	row := q.db.QueryRow(ctx, createSubscription,
+		arg.DiscordChannelID,
+		arg.LolUsername,
+		arg.Region,
+		arg.ServerID,
+	)
 	var i Subscription
 	err := row.Scan(
 		&i.ID,

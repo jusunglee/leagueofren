@@ -2,7 +2,7 @@
 CREATE TABLE subscriptions (
     id BIGSERIAL PRIMARY KEY,
     discord_channel_id TEXT NOT NULL,
-    server_id TEXT,
+    server_id TEXT NOT NULL,
     lol_username TEXT NOT NULL,
     region TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
