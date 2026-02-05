@@ -295,3 +295,14 @@ Write the string builder into a separate function
 ---
 
 is it a good idea to implement a feedback button + prompt into the message, or is there a more discord native way to retrieve this info?
+Add installing docker into make setup command, assume that we're either mac or windows WSLubuntu
+[2026-02-04 22:10:26] User prompt: Use bubbletea tui library to create a bootstrapping go script that will install atlas, air, walk through the user via interactive prompting with a link to each API to setup token and server ids, which should form a .env file, and install docker if needed (with resume capabilities since docker install requires restart) and start the postgres container and schema apply. This should be the actual make-setup command
+Design a Bubbletea TUI setup tool for this Go project.
+
+2026-02-04 22:25:45 - User: Implement the following plan: [Bubbletea TUI Setup Tool plan - see conversation]
+2026-02-04 22:25:45 - User: Install go, and add the installation cmd into the README setup section
+2026-02-04 22:25:45 - User: can we also change the readme to use go 1.26rc2
+2026-02-04 23:32:58 - User: change the discord step to also add 2. Click OAuth2 and check these perm boxes, click Bot, etc,
+2026-02-04 23:34:00 - User: Allow users to Ctrl C out of it
+2026-02-04 23:46:33 - User: In the input prompt for the discord section, the input field should have a label, paste the token from step x here
+2026-02-04 23:52:53 - User: edit the other input prompts so that it's clear what the user is supposed to paste in

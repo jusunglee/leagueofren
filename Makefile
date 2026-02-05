@@ -19,9 +19,7 @@ help:
 
 # Development setup
 setup:
-	git config core.hooksPath .githooks
-	@command -v atlas >/dev/null 2>&1 || { echo "Installing atlas..."; brew install ariga/tap/atlas; }
-	@echo "Development environment configured"
+	@go run cmd/setup/main.go
 
 # Docker Compose commands
 db-up:

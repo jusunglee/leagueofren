@@ -32,7 +32,7 @@ The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean a
 ## Quick Start
 
 ### 1. Prerequisites
-
+These will be installed with `make setup` on step 3. 
 - [Go 1.26+](https://go.dev/dl/)
 - [Docker](https://docs.docker.com/get-docker/)
 - [Atlas CLI](https://atlasgo.io/getting-started#installation): `brew install ariga/tap/atlas`
@@ -47,44 +47,34 @@ The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean a
 | Google AI API Key | AI translation (alternative) | [Google AI Studio](https://aistudio.google.com/app/apikey) → Get API Key |
 
 ### 3. Clone and Setup
+#### If you're on Windows enable WSL
+```
+wsl.exe --install
+```
+Then install [Ubuntu subsystem from windows store](https://apps.microsoft.com/detail/9pdxgncfsczv?hl=en-US&gl=US)
+and open Start->Ubuntu after restarting. Run all commands below from this terminal.
+
+#### Install Go
+```bash
+curl -LO https://go.dev/dl/go1.26rc2.linux-amd64.tar.gz && \
+  rm -rf ~/go && \
+  tar -C ~ -xzf go1.26rc2.linux-amd64.tar.gz && \
+  rm go1.26rc2.linux-amd64.tar.gz && \
+  echo 'export PATH=$PATH:~/go/bin' >> ~/.bashrc && \
+  source ~/.bashrc
+```
 
 ```bash
 git clone https://github.com/jusunglee/leagueofren.git
 cd leagueofren
 
 # Install tools (Atlas, air for hot reload)
+
 make setup
+
 ```
 
-### 4. Configure Environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your API keys:
-```bash
-DATABASE_URL=postgres://leagueofren:localdev123@localhost:5432/leagueofren?sslmode=disable
-DISCORD_TOKEN=your_discord_bot_token
-RIOT_API_KEY=your_riot_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-GOOGLE_API_KEY=your_google_api_key  # Optional, for Gemma models
-
-# Optional: For faster command registration during development
-DISCORD_GUILD_ID=your_test_server_id
-```
-
-### 5. Start Database and Apply Schema
-
-```bash
-# Start PostgreSQL
-make db-up
-
-# Apply database schema
-make schema-apply
-```
-
-### 6. Run the Bot
+### 4. Run the Bot
 
 ```bash
 make run
