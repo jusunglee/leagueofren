@@ -20,6 +20,7 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/google"
 	"github.com/jusunglee/leagueofren/internal/llm"
+	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/samber/lo"
@@ -90,6 +91,7 @@ var commands = []*discordgo.ApplicationCommand{
 
 func main() {
 	_ = godotenv.Load()
+	logger.Init()
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
