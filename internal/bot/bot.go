@@ -566,62 +566,85 @@ type sendMessageJob struct {
 
 func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]sendMessageJob, error) {
 	var jobs []sendMessageJob
+	var eg errgroup.Group
 	for _, sub := range subs {
-		username, tag, err := riot.ParseRiotID(sub.LolUsername)
-		if err != nil {
-			return nil, fmt.Errorf("parsing riot id: %w", err)
-		}
-
-		acc, err := b.riotClient.GetAccountByRiotID(ctx, username, tag, sub.Region)
-		if err != nil {
-			return nil, fmt.Errorf("getting account by riot id: %w", err)
-		}
-
-		game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
-		if errors.Is(err, riot.ErrNotInGame) {
-			b.log.InfoContext(ctx, "user not in game", "username", sub.LolUsername, "region", sub.Region)
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("getting active game %w", err)
-		}
-
-		_, err = b.repo.GetEvalByGameAndSubscription(ctx,
-			db.GetEvalByGameAndSubscriptionParams{
-				GameID:         sql.NullInt64{Int64: game.GameID, Valid: true},
-				SubscriptionID: sub.ID,
-			})
-
-		if !db.IsNoRows(err) {
-			b.log.InfoContext(ctx, "game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
-			continue
-		}
-
-		names := lo.FilterMap(game.Participants, func(p riot.Participant, i int) (string, bool) {
-			if !containsForeignCharacters(p.GameName) {
-				return "", false
+		eg.Go(func() error {
+			username, tag, err := riot.ParseRiotID(sub.LolUsername)
+			if err != nil {
+				return fmt.Errorf("parsing riot id: %w", err)
 			}
-			name, _, _ := riot.ParseRiotID(p.GameName)
-			return name, true
+
+			acc, err := b.riotClient.GetAccountByRiotID(ctx, username, tag, sub.Region)
+			if err != nil {
+				return fmt.Errorf("getting account by riot id: %w", err)
+			}
+
+			game, err := b.riotClient.GetActiveGame(ctx, acc.PUUID, sub.Region)
+			if errors.Is(err, riot.ErrNotInGame) {
+				b.log.InfoContext(ctx, "user not in game", "username", sub.LolUsername, "region", sub.Region)
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("getting active game %w", err)
+			}
+
+			_, err = b.repo.GetEvalByGameAndSubscription(ctx,
+				db.GetEvalByGameAndSubscriptionParams{
+					GameID:         sql.NullInt64{Int64: game.GameID, Valid: true},
+					SubscriptionID: sub.ID,
+				})
+
+			// TODO: Ignore games that were already seen for a specific channel. This can happen if there's
+			// 2 subs, 1 for each player, for a 2-premade. Or if they just encounter each other on the rift.
+			// This is a little annoying so I'll put this off until people complain about it.
+			if !db.IsNoRows(err) {
+				b.log.InfoContext(ctx, "game already evaluated for this subscription", "subscription_id", sub.ID, "game_id", game.GameID)
+				return nil
+			}
+
+			var names []string
+			for _, p := range game.Participants {
+				if !containsForeignCharacters(p.GameName) {
+					continue
+				}
+
+				// Ignore self
+				if p.GameName == sub.LolUsername {
+					continue
+				}
+
+				// Don't best effort within a game because missing some translations seems sloppy and is bad UX.
+				name, _, err := riot.ParseRiotID(p.GameName)
+				if err != nil {
+					return fmt.Errorf("unable to parse riot id %s: %w", p.GameName, err)
+				}
+				names = append(names, name)
+			}
+
+			if len(names) == 0 {
+				b.log.InfoContext(ctx, "no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
+				return nil
+			}
+
+			translations, err := b.translator.TranslateUsernames(ctx, names)
+			if err != nil {
+				return nil
+			}
+
+			embed := formatTranslationEmbed(sub.LolUsername, translations)
+			jobs = append(jobs, sendMessageJob{
+				message:        embed,
+				channelID:      sub.DiscordChannelID,
+				subscriptionID: sub.ID,
+				gameID:         game.GameID,
+			})
+			return nil
 		})
+	}
 
-		if len(names) == 0 {
-			b.log.InfoContext(ctx, "no foreign character names in game", "subscription_id", sub.ID, "game_id", game.GameID, "names", game.Participants)
-			continue
-		}
-
-		translations, err := b.translator.TranslateUsernames(ctx, names)
-		if err != nil {
-			return nil, fmt.Errorf("translating usernames: %w", err)
-		}
-
-		embed := formatTranslationEmbed(sub.LolUsername, translations)
-		jobs = append(jobs, sendMessageJob{
-			message:        embed,
-			channelID:      sub.DiscordChannelID,
-			subscriptionID: sub.ID,
-			gameID:         game.GameID,
-		})
+	if err := eg.Wait(); err != nil {
+		// Return jobs for best effort
+		return jobs, fmt.Errorf("producing for all channels in server: %w", err)
 	}
 
 	return jobs, nil
@@ -698,6 +721,7 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 			mu.Lock()
 			jobs = append(jobs, serverJobs...)
 			mu.Unlock()
+			// Best effort
 			if err != nil {
 				return fmt.Errorf("producing for server %s: %w", server, err)
 			}

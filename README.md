@@ -2,6 +2,8 @@
 
 A Discord bot that translates Korean and Chinese summoner names in League of Legends games for subscribed users.
 
+We use Discord instead of just `/msg` -ing you in-game because it's, for good reason, not supported by the official riot server API. There's future plans to do this anyways with the game client API if enough people just want to deploy this locally, since you'll just be whispering to yourself.
+
 ## Overview
 
 LeagueOfRen monitors League of Legends players and automatically translates non-English summoner names in their games. When a subscribed player starts a game, the bot detects Korean/Chinese character usernames and provides translations in the Discord channel using AI.
@@ -65,6 +67,7 @@ The wizard saves your configuration to `.env` automatically. The bot creates a l
 <summary><b>Windows (WSL required)</b></summary>
 
 Enable WSL and install Ubuntu:
+
 ```powershell
 wsl.exe --install
 ```
@@ -79,6 +82,7 @@ Install [Ubuntu from Microsoft Store](https://apps.microsoft.com/detail/9pdxgncf
 <summary><b>macOS</b></summary>
 
 Install Homebrew if you haven't:
+
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
@@ -88,11 +92,13 @@ Install Homebrew if you haven't:
 #### 2. Install Go
 
 **macOS:**
+
 ```bash
 brew install go
 ```
 
 **Linux/WSL:**
+
 ```bash
 curl -LO https://go.dev/dl/go1.26rc2.linux-amd64.tar.gz && \
   rm -rf ~/go && \
@@ -117,6 +123,7 @@ make run
 ```
 
 On first run, an interactive setup wizard walks you through configuring:
+
 - Discord bot token
 - Riot API key
 - LLM provider (Anthropic or Google)
@@ -125,6 +132,7 @@ On first run, an interactive setup wizard walks you through configuring:
 The wizard saves your configuration to `.env` automatically.
 
 **With PostgreSQL (optional, for development):**
+
 ```bash
 make db-up        # Start PostgreSQL in Docker
 make schema-apply # Apply database schema
