@@ -17,9 +17,17 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
+// dbExecutor is an interface that both *sql.DB and *sql.Tx implement
+type dbExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
 // Repository implements db.Repository using SQLite
 type Repository struct {
-	db *sql.DB
+	db       *sql.DB
+	executor dbExecutor
 }
 
 // New creates a new SQLite repository
@@ -49,7 +57,10 @@ func New(ctx context.Context, dbPath string) (*Repository, error) {
 		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
-	repo := &Repository{db: sqliteDB}
+	repo := &Repository{
+		db:       sqliteDB,
+		executor: sqliteDB,
+	}
 
 	if isNew {
 		if _, err := sqliteDB.ExecContext(ctx, schemaSQL); err != nil {
@@ -66,10 +77,36 @@ func (r *Repository) Close() error {
 	return r.db.Close()
 }
 
+func (r *Repository) WithTx(ctx context.Context, fn func(repo db.Repository) error) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+
+	txRepo := &Repository{
+		db:       r.db,
+		executor: tx,
+	}
+
+	err = fn(txRepo)
+	if err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("transaction error: %w, rollback error: %v", err, rbErr)
+		}
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+
+	return nil
+}
+
 // Subscription methods
 
 func (r *Repository) CreateSubscription(ctx context.Context, arg db.CreateSubscriptionParams) (db.Subscription, error) {
-	result, err := r.db.ExecContext(ctx, `
+	result, err := r.executor.ExecContext(ctx, `
 		INSERT INTO subscriptions (discord_channel_id, lol_username, region, server_id)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (discord_channel_id, lol_username, region) DO NOTHING
@@ -95,7 +132,7 @@ func (r *Repository) CreateSubscription(ctx context.Context, arg db.CreateSubscr
 }
 
 func (r *Repository) GetAllSubscriptions(ctx context.Context, limit int32) ([]db.Subscription, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.executor.QueryContext(ctx, `
 		SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 		FROM subscriptions
 		ORDER BY created_at DESC
@@ -110,7 +147,7 @@ func (r *Repository) GetAllSubscriptions(ctx context.Context, limit int32) ([]db
 }
 
 func (r *Repository) GetSubscriptionsByChannel(ctx context.Context, discordChannelID string) ([]db.Subscription, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.executor.QueryContext(ctx, `
 		SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 		FROM subscriptions
 		WHERE discord_channel_id = ?
@@ -125,7 +162,7 @@ func (r *Repository) GetSubscriptionsByChannel(ctx context.Context, discordChann
 }
 
 func (r *Repository) GetSubscriptionByID(ctx context.Context, id int64) (db.Subscription, error) {
-	row := r.db.QueryRowContext(ctx, `
+	row := r.executor.QueryRowContext(ctx, `
 		SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 		FROM subscriptions
 		WHERE id = ?
@@ -136,14 +173,14 @@ func (r *Repository) GetSubscriptionByID(ctx context.Context, id int64) (db.Subs
 
 func (r *Repository) CountSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
 	var count int64
-	err := r.db.QueryRowContext(ctx, `
+	err := r.executor.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM subscriptions WHERE server_id = ?
 	`, serverID).Scan(&count)
 	return count, err
 }
 
 func (r *Repository) DeleteSubscription(ctx context.Context, arg db.DeleteSubscriptionParams) (int64, error) {
-	result, err := r.db.ExecContext(ctx, `
+	result, err := r.executor.ExecContext(ctx, `
 		DELETE FROM subscriptions
 		WHERE discord_channel_id = ? AND lol_username = ? AND region = ?
 	`, arg.DiscordChannelID, arg.LolUsername, arg.Region)
@@ -166,7 +203,7 @@ func (r *Repository) DeleteSubscriptions(ctx context.Context, ids []int64) (int6
 	}
 
 	query := fmt.Sprintf("DELETE FROM subscriptions WHERE id IN (%s)", strings.Join(placeholders, ","))
-	result, err := r.db.ExecContext(ctx, query, args...)
+	result, err := r.executor.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -174,7 +211,7 @@ func (r *Repository) DeleteSubscriptions(ctx context.Context, ids []int64) (int6
 }
 
 func (r *Repository) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `
+	_, err := r.executor.ExecContext(ctx, `
 		UPDATE subscriptions SET last_evaluated_at = datetime('now') WHERE id = ?
 	`, id)
 	return err
@@ -183,7 +220,7 @@ func (r *Repository) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id i
 // Eval methods
 
 func (r *Repository) CreateEval(ctx context.Context, arg db.CreateEvalParams) (db.Eval, error) {
-	result, err := r.db.ExecContext(ctx, `
+	result, err := r.executor.ExecContext(ctx, `
 		INSERT INTO evals (subscription_id, eval_status, discord_message_id, game_id)
 		VALUES (?, ?, ?, ?)
 	`, arg.SubscriptionID, arg.EvalStatus, nullString(arg.DiscordMessageID), nullInt64(arg.GameID))
@@ -196,7 +233,7 @@ func (r *Repository) CreateEval(ctx context.Context, arg db.CreateEvalParams) (d
 		return db.Eval{}, err
 	}
 
-	row := r.db.QueryRowContext(ctx, `
+	row := r.executor.QueryRowContext(ctx, `
 		SELECT id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id
 		FROM evals WHERE id = ?
 	`, id)
@@ -205,7 +242,7 @@ func (r *Repository) CreateEval(ctx context.Context, arg db.CreateEvalParams) (d
 }
 
 func (r *Repository) GetEvalByGameAndSubscription(ctx context.Context, arg db.GetEvalByGameAndSubscriptionParams) (db.Eval, error) {
-	row := r.db.QueryRowContext(ctx, `
+	row := r.executor.QueryRowContext(ctx, `
 		SELECT id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id
 		FROM evals
 		WHERE game_id = ? AND subscription_id = ?
@@ -216,7 +253,7 @@ func (r *Repository) GetEvalByGameAndSubscription(ctx context.Context, arg db.Ge
 }
 
 func (r *Repository) GetLatestEvalForSubscription(ctx context.Context, subscriptionID int64) (db.Eval, error) {
-	row := r.db.QueryRowContext(ctx, `
+	row := r.executor.QueryRowContext(ctx, `
 		SELECT id, subscription_id, game_id, evaluated_at, eval_status, discord_message_id
 		FROM evals
 		WHERE subscription_id = ?
@@ -228,7 +265,7 @@ func (r *Repository) GetLatestEvalForSubscription(ctx context.Context, subscript
 }
 
 func (r *Repository) DeleteEvals(ctx context.Context, before time.Time) (int64, error) {
-	result, err := r.db.ExecContext(ctx, `
+	result, err := r.executor.ExecContext(ctx, `
 		DELETE FROM evals WHERE evaluated_at < ?
 	`, before.Format(time.RFC3339))
 	if err != nil {
@@ -238,7 +275,7 @@ func (r *Repository) DeleteEvals(ctx context.Context, before time.Time) (int64, 
 }
 
 func (r *Repository) FindSubscriptionsWithExpiredNewestOnlineEval(ctx context.Context, before time.Time) ([]db.FindSubscriptionsWithExpiredNewestOnlineEvalRow, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.executor.QueryContext(ctx, `
 		SELECT subscription_id, MAX(evaluated_at) as newest_online_eval
 		FROM evals
 		WHERE eval_status != 'OFFLINE'
@@ -266,7 +303,7 @@ func (r *Repository) FindSubscriptionsWithExpiredNewestOnlineEval(ctx context.Co
 // Translation methods
 
 func (r *Repository) CreateTranslation(ctx context.Context, arg db.CreateTranslationParams) (db.Translation, error) {
-	_, err := r.db.ExecContext(ctx, `
+	_, err := r.executor.ExecContext(ctx, `
 		INSERT INTO translations (username, translation, provider, model)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT (username) DO UPDATE SET translation = ?, provider = ?, model = ?
@@ -279,7 +316,7 @@ func (r *Repository) CreateTranslation(ctx context.Context, arg db.CreateTransla
 }
 
 func (r *Repository) GetTranslation(ctx context.Context, username string) (db.Translation, error) {
-	row := r.db.QueryRowContext(ctx, `
+	row := r.executor.QueryRowContext(ctx, `
 		SELECT id, username, translation, provider, model, created_at
 		FROM translations WHERE username = ?
 	`, username)
@@ -304,7 +341,7 @@ func (r *Repository) GetTranslations(ctx context.Context, usernames []string) ([
 		FROM translations WHERE username IN (%s)
 	`, strings.Join(placeholders, ","))
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.executor.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +351,7 @@ func (r *Repository) GetTranslations(ctx context.Context, usernames []string) ([
 }
 
 func (r *Repository) GetTranslationsForEval(ctx context.Context, evalID int64) ([]db.Translation, error) {
-	rows, err := r.db.QueryContext(ctx, `
+	rows, err := r.executor.QueryContext(ctx, `
 		SELECT t.id, t.username, t.translation, t.provider, t.model, t.created_at
 		FROM translations t
 		JOIN translation_to_evals tte ON t.id = tte.translation_id
@@ -329,7 +366,7 @@ func (r *Repository) GetTranslationsForEval(ctx context.Context, evalID int64) (
 }
 
 func (r *Repository) CreateTranslationToEval(ctx context.Context, arg db.CreateTranslationToEvalParams) error {
-	_, err := r.db.ExecContext(ctx, `
+	_, err := r.executor.ExecContext(ctx, `
 		INSERT INTO translation_to_evals (translation_id, eval_id)
 		VALUES (?, ?)
 		ON CONFLICT DO NOTHING
@@ -340,7 +377,7 @@ func (r *Repository) CreateTranslationToEval(ctx context.Context, arg db.CreateT
 // Feedback methods
 
 func (r *Repository) CreateFeedback(ctx context.Context, arg db.CreateFeedbackParams) (db.Feedback, error) {
-	result, err := r.db.ExecContext(ctx, `
+	result, err := r.executor.ExecContext(ctx, `
 		INSERT INTO feedback (discord_message_id, feedback_text)
 		VALUES (?, ?)
 	`, arg.DiscordMessageID, arg.FeedbackText)
@@ -355,7 +392,7 @@ func (r *Repository) CreateFeedback(ctx context.Context, arg db.CreateFeedbackPa
 
 	var f db.Feedback
 	var createdAtStr string
-	err = r.db.QueryRowContext(ctx, `
+	err = r.executor.QueryRowContext(ctx, `
 		SELECT id, discord_message_id, feedback_text, created_at FROM feedback WHERE id = ?
 	`, id).Scan(&f.ID, &f.DiscordMessageID, &f.FeedbackText, &createdAtStr)
 	if err != nil {
@@ -369,7 +406,7 @@ func (r *Repository) CreateFeedback(ctx context.Context, arg db.CreateFeedbackPa
 
 func (r *Repository) GetCachedAccount(ctx context.Context, arg db.GetCachedAccountParams) (db.GetCachedAccountRow, error) {
 	var row db.GetCachedAccountRow
-	err := r.db.QueryRowContext(ctx, `
+	err := r.executor.QueryRowContext(ctx, `
 		SELECT game_name, tag_line, region, puuid
 		FROM riot_account_cache
 		WHERE game_name = ? AND tag_line = ? AND region = ? AND expires_at > datetime('now')
@@ -381,7 +418,7 @@ func (r *Repository) GetCachedAccount(ctx context.Context, arg db.GetCachedAccou
 }
 
 func (r *Repository) CacheAccount(ctx context.Context, arg db.CacheAccountParams) error {
-	_, err := r.db.ExecContext(ctx, `
+	_, err := r.executor.ExecContext(ctx, `
 		INSERT INTO riot_account_cache (game_name, tag_line, region, puuid, expires_at)
 		VALUES (?, ?, ?, ?, datetime('now', '+24 hours'))
 		ON CONFLICT (game_name, tag_line, region)
@@ -393,7 +430,7 @@ func (r *Repository) CacheAccount(ctx context.Context, arg db.CacheAccountParams
 func (r *Repository) GetCachedGameStatus(ctx context.Context, arg db.GetCachedGameStatusParams) (db.GetCachedGameStatusRow, error) {
 	var row db.GetCachedGameStatusRow
 	var inGame int
-	err := r.db.QueryRowContext(ctx, `
+	err := r.executor.QueryRowContext(ctx, `
 		SELECT puuid, region, in_game, game_id, participants
 		FROM riot_game_cache
 		WHERE puuid = ? AND region = ? AND expires_at > datetime('now')
@@ -410,7 +447,7 @@ func (r *Repository) CacheGameStatus(ctx context.Context, arg db.CacheGameStatus
 	if arg.InGame {
 		inGame = 1
 	}
-	_, err := r.db.ExecContext(ctx, `
+	_, err := r.executor.ExecContext(ctx, `
 		INSERT INTO riot_game_cache (puuid, region, in_game, game_id, participants, expires_at)
 		VALUES (?, ?, ?, ?, ?, datetime('now', '+2 minutes'))
 		ON CONFLICT (puuid, region)
@@ -420,12 +457,12 @@ func (r *Repository) CacheGameStatus(ctx context.Context, arg db.CacheGameStatus
 }
 
 func (r *Repository) DeleteExpiredAccountCache(ctx context.Context) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM riot_account_cache WHERE expires_at < datetime('now')`)
+	_, err := r.executor.ExecContext(ctx, `DELETE FROM riot_account_cache WHERE expires_at < datetime('now')`)
 	return err
 }
 
 func (r *Repository) DeleteExpiredGameCache(ctx context.Context) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM riot_game_cache WHERE expires_at < datetime('now')`)
+	_, err := r.executor.ExecContext(ctx, `DELETE FROM riot_game_cache WHERE expires_at < datetime('now')`)
 	return err
 }
 

@@ -200,6 +200,9 @@ type Repository interface {
 	DeleteExpiredAccountCache(ctx context.Context) error
 	DeleteExpiredGameCache(ctx context.Context) error
 
+	// Transaction support
+	WithTx(ctx context.Context, fn func(repo Repository) error) error
+
 	// Lifecycle
 	Close() error
 }

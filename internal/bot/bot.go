@@ -674,20 +674,29 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		return fmt.Errorf("sending discord message: %w", err)
 	}
 
-	// TODO: do all this under a transaction because it's an invariant violation to create a eval but not update the denormalized subscription field
-	_, err = b.repo.CreateEval(ctx, db.CreateEvalParams{
-		SubscriptionID:   job.subscriptionID,
-		EvalStatus:       "NEW_TRANSLATIONS",
-		DiscordMessageID: sql.NullString{String: msg.ID, Valid: true},
-		GameID:           sql.NullInt64{Int64: job.gameID, Valid: true},
+	// All or nothing because we don't want either the eval or the denormalized subscription field without the other
+	// since it's an invariant violation.
+	err = b.repo.WithTx(ctx, func(txRepo db.Repository) error {
+		var txErr error
+		_, txErr = txRepo.CreateEval(ctx, db.CreateEvalParams{
+			SubscriptionID:   job.subscriptionID,
+			EvalStatus:       "NEW_TRANSLATIONS",
+			DiscordMessageID: sql.NullString{String: msg.ID, Valid: true},
+			GameID:           sql.NullInt64{Int64: job.gameID, Valid: true},
+		})
+		if txErr != nil {
+			return fmt.Errorf("creating eval record: %w", txErr)
+		}
+
+		txErr = txRepo.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
+		if txErr != nil {
+			return fmt.Errorf("updating subscription last evaluated at: %w", txErr)
+		}
+
+		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("creating eval record: %w", err)
-	}
-
-	err = b.repo.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
-	if err != nil {
-		return fmt.Errorf("updating subscription last evaluated at: %w", err)
+		return err
 	}
 
 	b.log.InfoContext(ctx, "sent and processed translation message",

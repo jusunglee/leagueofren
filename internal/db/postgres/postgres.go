@@ -53,6 +53,32 @@ func (r *Repository) Close() error {
 	return nil
 }
 
+func (r *Repository) WithTx(ctx context.Context, fn func(repo db.Repository) error) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+
+	txRepo := &Repository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+
+	err = fn(txRepo)
+	if err != nil {
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			return fmt.Errorf("transaction error: %w, rollback error: %v", err, rbErr)
+		}
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+
+	return nil
+}
+
 // Subscription methods
 
 func (r *Repository) CreateSubscription(ctx context.Context, arg db.CreateSubscriptionParams) (db.Subscription, error) {

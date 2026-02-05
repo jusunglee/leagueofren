@@ -340,3 +340,104 @@ I anticipate that a lot of my users are on Windows but not programmer-savvy
 2026-02-05 - Implement the following plan: Setup Wizard Implementation (bubbletea TUI that runs on first launch when no .env exists)
 2026-02-05 - Update the README with this new flow, most notably users shouldn't have to create a .env file manually, for either windows release or for build from source.
 2026-02-05 - Is it possible to create a github action that will build everything + cut a release? (already exists, just needed to fix go version format for RC)
+Implement the following plan:
+
+# Add Transaction Support for consumeTranslationMessages
+
+## Problem
+The `consumeTranslationMessages` function in `/Users/jlee/code/leagueofren/internal/bot/bot.go` (lines 653-700) has a TODO comment indicating that two database operations should be wrapped in a transaction:
+
+1. `CreateEval` - Creates an evaluation record with subscription_id, eval_status, discord_message_id, and game_id
+2. `UpdateSubscriptionLastEvaluatedAt` - Updates the subscription's last_evaluated_at timestamp
+
+Currently, if `CreateEval` succeeds but `UpdateSubscriptionLastEvaluatedAt` fails, the data becomes inconsistent (invariant violation).
+
+## Solution Design
+
+### 1. Add Transaction Method to Repository Interface
+Add a `WithTx` method to the `Repository` interface in `/Users/jlee/code/leagueofren/internal/db/repository.go`:
+
+```go
+// Transaction support
+WithTx(ctx context.Context, fn func(repo Repository) error) error
+```
+
+This follows the functional callback pattern where the transaction logic is passed as a function.
+
+### 2. Implement WithTx in PostgreSQL Adapter
+In `/Users/jlee/code/leagueofren/internal/db/postgres/postgres.go`:
+
+- Use `pool.BeginTx(ctx, pgx.TxOptions{})` to start a transaction
+- Create a new `Repository` instance with the transaction-bound queries using `queries.WithTx(tx)`
+- Execute the callback function with the transaction-bound repository
+- Commit on success, rollback on error
+- Return any errors from the callback or transaction operations
+
+### 3. Implement WithTx in SQLite Adapter
+In `/Users/jlee/code/leagueofren/internal/db/sqlite/sqlite.go`:
+
+- Use `db.BeginTx(ctx, nil)` to start a transaction
+- Create a new `Repository` instance with the transaction-bound `*sql.Tx`
+- Execute the callback function with the transaction-bound repository
+- Commit on success, rollback on error
+- Return any errors from the callback or transaction operations
+
+### 4. Update consumeTranslationMessages
+In `/Users/jlee/code/leagueofren/internal/bot/bot.go` (lines 677-691):
+
+Replace the current sequential calls with a `WithTx` wrapper:
+
+```go
+var eval db.Eval
+err = b.repo.WithTx(ctx, func(txRepo db.Repository) error {
+    var txErr error
+    eval, txErr = txRepo.CreateEval(ctx, db.CreateEvalParams{
+        SubscriptionID:   job.subscriptionID,
+        EvalStatus:       "NEW_TRANSLATIONS",
+        DiscordMessageID: sql.NullString{String: msg.ID, Valid: true},
+        GameID:           sql.NullInt64{Int64: job.gameID, Valid: true},
+    })
+    if txErr != nil {
+        return fmt.Errorf("creating eval record: %w", txErr)
+    }
+
+    txErr = txRepo.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
+    if txErr != nil {
+        return fmt.Errorf("updating subscription last evaluated at: %w", txErr)
+    }
+
+    return nil
+})
+if err != nil {
+    return err
+}
+```
+
+Remove the TODO comment since the issue is now resolved.
+
+## Files to Modify
+
+1. **`/Users/jlee/code/leagueofren/internal/db/repository.go`**
+   - Add `WithTx` method to Repository interface (after line 204, before Close())
+
+2. **`/Users/jlee/code/leagueofren/internal/db/postgres/postgres.go`**
+   - Implement `WithTx` method for PostgreSQL using pgx transactions
+   - Add after the Close() method (after line 54)
+
+3. **`/Users/jlee/code/leagueofren/internal/db/sqlite/sqlite.go`**
+   - Implement `WithTx` method for SQLite using database/sql transactions
+   - Add after the Close() method (after line 67)
+
+4. **`/Users/jlee/code/leagueofren/internal/bot/bot.go`**
+   - Update `consumeTranslationMessages` to use transaction (lines 677-691)
+   - Remove TODO comment (line 677)
+
+## Verification
+
+1. **Build test**: Run `go build ./...` to ensure no compilation errors
+2. **Unit test**: Create a test that verifies transaction rollback on error
+3. **Integration test**: Run the bot and trigger a translation message to verify both queries execute atomically
+4. **Error simulation**: Force an error in `UpdateSubscriptionLastEvaluatedAt` to verify the transaction rolls back and `CreateEval` doesn't persist
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/jlee/.claude/projects/-Users-jlee-code-leagueofren/e1182785-7412-48b1-af5b-f20fc8798139.jsonl
