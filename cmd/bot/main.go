@@ -639,16 +639,30 @@ func containsForeignCharacters(s string) bool {
 }
 
 func formatTranslationEmbed(username string, translations []translation.Translation) *discordgo.MessageEmbed {
-	fields := make([]*discordgo.MessageEmbedField, 0, len(translations)*3)
+	const maxInlineEntries = 8
+	fields := make([]*discordgo.MessageEmbedField, 0, 25)
 
-	for i, t := range translations {
+	inlineCount := min(len(translations), maxInlineEntries)
+	for i := 0; i < inlineCount; i++ {
+		t := translations[i]
 		fields = append(fields,
 			&discordgo.MessageEmbedField{Name: "Original", Value: t.Original, Inline: true},
 			&discordgo.MessageEmbedField{Name: "Translation", Value: t.Translated, Inline: true},
 		)
-		if i < len(translations)-1 {
+		if i < inlineCount-1 {
 			fields = append(fields, &discordgo.MessageEmbedField{Name: "\u200b", Value: "\u200b", Inline: false})
 		}
+	}
+
+	if len(translations) > maxInlineEntries {
+		var sb strings.Builder
+		for _, t := range translations[maxInlineEntries:] {
+			sb.WriteString(fmt.Sprintf("**%s** → %s\n", t.Original, t.Translated))
+		}
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:  "\u200b",
+			Value: sb.String(),
+		})
 	}
 
 	return &discordgo.MessageEmbed{
