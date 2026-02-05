@@ -123,8 +123,13 @@ func mainE() error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		<-sigChan
-		cancel(nil)
+		sig := <-sigChan
+		slog.Info("received signal, shutting down gracefully", "signal", sig, slog.Duration("timeout", time.Minute))
+		cancel(errors.New("signal received"))
+
+		sig = <-sigChan
+		slog.Warn("received second signal, forcing exit", "signal", sig)
+		os.Exit(1)
 	}()
 
 	return b.Run(ctx, cancel)

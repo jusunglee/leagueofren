@@ -60,6 +60,7 @@ func New(
 // TODO: Support ignore lists
 // TODO: If limits get tight we can restrict one subscription signature per server, so you can't have duplicate subscriptions over different channels in the same server
 // TODO: metrics into grafana/lokiw
+// TODO: When https://github.com/golangci/golangci-lint/pull/6271 merges, enable exhaustruct and errcheck in golangci-lint
 
 func (b *Bot) Run(ctx context.Context, cancel context.CancelCauseFunc) error {
 	b.session.AddHandler(b.handleInteraction)
@@ -94,7 +95,6 @@ func (b *Bot) Run(ctx context.Context, cancel context.CancelCauseFunc) error {
 
 	<-ctx.Done()
 	b.log.Info("shutdown signal received")
-	cancel(errors.New("shutdown signal received"))
 	wg.Wait()
 	b.session.Close()
 	b.log.InfoContext(ctx, "shut down complete")
@@ -128,13 +128,17 @@ func (b *Bot) runProducer(ctx context.Context, ch chan<- sendMessageJob, wg *syn
 	defer wg.Done()
 	defer close(ch)
 	for ctx.Err() == nil {
-		produceCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+		produceCtx, cancel := context.WithTimeout(ctx, b.config.EvaluateSubscriptionsTimeout)
 		jobs, err := b.produceTranslationMessages(produceCtx)
+		// Best effort send jobs even if there's an error, just make sure to log it
 		b.log.Info("produced jobs", slog.Int("num_jobs", len(jobs)))
+
+		// Send jobs even if ctx cancelled - give them a chance to drain
 		for _, job := range jobs {
 			select {
-			case <-ctx.Done():
-				b.log.InfoContext(ctx, "context done, exiting producer")
+			case <-time.After(time.Minute):
+				// Timeout waiting to send - channel full and consumers stopped
+				b.log.Warn("timeout sending job, dropping")
 				cancel()
 				return
 			case ch <- job:
@@ -155,7 +159,9 @@ func (b *Bot) runConsumer(ctx context.Context, ch <-chan sendMessageJob, wg *syn
 	defer wg.Done()
 	log := b.log.With("consumer_id", id)
 	for job := range ch {
-		processCtx, cancel := context.WithTimeout(ctx, time.Minute)
+		// Use Background so shutdown doesn't cancel in-flight work
+		processCtx, cancel := context.WithTimeout(context.Background(),
+			time.Minute)
 		err := b.consumeTranslationMessages(processCtx, job)
 		if err != nil {
 			log.Error("consuming", "error", err)
@@ -169,18 +175,11 @@ func (b *Bot) runCleaner(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for ctx.Err() == nil {
 		cleanupCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-		select {
-		case <-ctx.Done():
-			b.log.InfoContext(ctx, "context done, exiting cleaner")
-			cancel()
-			return
-		default:
-			err := b.cleanupOldData(cleanupCtx)
-			if err != nil {
-				b.log.Error("deleting old data", "error", err)
-			}
-		}
+		err := b.cleanupOldData(cleanupCtx)
 		cancel()
+		if err != nil {
+			b.log.Error("deleting old data", "error", err)
+		}
 		sleepWithContext(ctx, time.Hour)
 	}
 }
