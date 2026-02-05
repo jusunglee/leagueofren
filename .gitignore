@@ -5,7 +5,6 @@ bin/
 *.dll
 *.so
 *.dylib
-bot
 tmp/
 
 # Test binary

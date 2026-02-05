@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/joho/godotenv v1.5.1
+	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/samber/lo v1.52.0
 	golang.org/x/sync v0.17.0
 	google.golang.org/genai v1.44.0

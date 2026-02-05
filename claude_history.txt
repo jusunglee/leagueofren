@@ -312,3 +312,6 @@ Add the linter to the precommit hook, including the setup for it
 Can you code review my producer consumer model? This is my first attempt at using channels and I want to make sure it's set up idiomatically. There should be no deadlocks, no invisible errors, and the shutdown should be graceful.
 2026-02-05 15:11:11 - User: Can you evaluate my worker producer code?
 2026-02-05 15:22:31 - User: Evaluate a second time. Specifically, just focus on lines 282 to 373.
+Move everything that's bot specific into a bot package. The main.go should basically only contain the main function.
+Let's use https://github.com/peterbourgon/ff for the flags, they have a neat feature where cli-flags and env vars are "intermingled" (taking passed in flags as higher pri) so we can leverage the .env file we have but consume them more cleanly. They have better sane defaults and the declaration for these flags are way cleaner and more readable.
+Let's separate main into main and mainE. mainE contains most of current main but returns an err instead of os.Exit or any other kind of panics. main should get an err from mainE and only os.Exit from there. The goal is that there's no exits/panics in mainE, and only 1 in main
