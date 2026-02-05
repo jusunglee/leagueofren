@@ -310,3 +310,4 @@ replace all log.Info or Warn or Error with the context version
 Add the exhaustruct linter rule
 Add the linter to the precommit hook, including the setup for it
 Can you code review my producer consumer model? This is my first attempt at using channels and I want to make sure it's set up idiomatically. There should be no deadlocks, no invisible errors, and the shutdown should be graceful.
+2026-02-05 15:11:11 - User: Can you evaluate my worker producer code?

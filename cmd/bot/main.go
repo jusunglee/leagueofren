@@ -101,7 +101,7 @@ var commands = []*discordgo.ApplicationCommand{
 func main() {
 	_ = godotenv.Load()
 	log := logger.New()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancelCause(context.Background())
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -178,6 +178,16 @@ func main() {
 		log.ErrorContext(ctx, "OFFLINE_ACTIVITY_THRESHOLD environment variable is not a valid duration", "error", err)
 		os.Exit(1)
 	}
+
+	numConsumersString := os.Getenv("NUM_CONSUMERS")
+	if numConsumersString == "0" {
+		numConsumersString = "2"
+	}
+	numConsumers, err := strconv.ParseInt(numConsumersString, 10, 64)
+	if err != nil {
+		log.ErrorContext(ctx, "NUM_CONSUMERS environment variable is not a valid integer", "error", err)
+	}
+	// TODO: use https://github.com/peterbourgon/ff because this is atrocious flag parsing. It can be beautiful.
 
 	var client llm.Client
 	switch provider {
@@ -265,18 +275,19 @@ func main() {
 		log.InfoContext(ctx, "registered commands", "count", len(commands))
 	}
 
-	ch := make(chan sendMessageJob)
-	var wg *sync.WaitGroup
+	ch := make(chan sendMessageJob, 20)
+	var wg sync.WaitGroup
 
+	// Producer
 	wg.Add(1)
 	go (func() {
 		defer wg.Done()
+		defer close(ch)
 		for {
-			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			defer cancel()
-			jobs, err := bot.produceTranslationMessages(ctx)
+			produceCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+			jobs, err := bot.produceTranslationMessages(produceCtx)
 			if err != nil {
-				log.ErrorContext(ctx, "running eval", "error", err)
+				log.ErrorContext(produceCtx, "running eval", "error", err)
 				sleepWithContext(ctx, time.Minute)
 				continue
 			}
@@ -292,45 +303,42 @@ func main() {
 			}
 
 			sleepWithContext(ctx, time.Minute)
+			cancel()
 		}
 	})()
 
-	wg.Add(1)
-	go (func() {
-		defer wg.Done()
-		for {
-			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			defer cancel()
-			select {
-			case <-ctx.Done():
-				log.InfoContext(ctx, "context done, exiting consumer")
-				return
-			case job, ok := <-ch:
-				if !ok {
-					log.WarnContext(ctx, "channel closed, exiting consumer")
-				}
-				evalCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-				defer cancel()
-				err := bot.consumeTranslationMessages(evalCtx, job)
+	// Consumers
+	log.InfoContext(ctx, "starting %d consumers", numConsumers)
+	for i := range numConsumers {
+		wg.Add(1)
+		log := log.With("consumer_id", i)
+		go func() {
+			defer wg.Done()
+			for job := range ch {
+				processCtx, cancel := context.WithTimeout(ctx, time.Minute)
+				err := bot.consumeTranslationMessages(processCtx, job)
+				cancel()
 				if err != nil {
-					log.ErrorContext(evalCtx, "running eval", "error", err)
+					log.Error("consuming", "error", err)
 				}
 			}
-		}
-	})()
+			log.Info("consumer stopped")
+		}()
+	}
 
+	// Background cleaner task to get rid of stale subscriptions/evals
 	wg.Add(1)
 	go (func() {
 		defer wg.Done()
 		for {
-			ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			defer cancel()
+			cleanupCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 			select {
 			case <-ctx.Done():
 				log.InfoContext(ctx, "context done, exiting consumer")
 				return
 			default:
-				err := bot.cleanupOldData(ctx)
+				err := bot.cleanupOldData(cleanupCtx)
+				cancel()
 				if err != nil {
 					log.Error("deleting old data", "error", err)
 				}
@@ -345,12 +353,10 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
-
+	log.Info("shutdown signal received")
+	cancel(errors.New("shutdown signal received"))
 	wg.Wait()
-	close(sigChan)
-	close(ch)
-
-	log.InfoContext(ctx, "shutting down")
+	log.InfoContext(ctx, "shut down complete")
 }
 
 func sleepWithContext(ctx context.Context, dur time.Duration) {
@@ -814,8 +820,8 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	for server, subs := range servers {
 		eg.Go(func() error {
 			serverJobs, err := b.produceForServer(ctx, subs)
-			jobs = append(jobs, serverJobs...)
 			mu.Lock()
+			jobs = append(jobs, serverJobs...)
 			mu.Unlock()
 			if err != nil {
 				return fmt.Errorf("producing for server %s: %w", server, err)
