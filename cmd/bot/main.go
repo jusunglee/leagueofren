@@ -186,6 +186,7 @@ func main() {
 	numConsumers, err := strconv.ParseInt(numConsumersString, 10, 64)
 	if err != nil {
 		log.ErrorContext(ctx, "NUM_CONSUMERS environment variable is not a valid integer", "error", err)
+		os.Exit(1)
 	}
 	// TODO: use https://github.com/peterbourgon/ff because this is atrocious flag parsing. It can be beautiful.
 
@@ -283,44 +284,51 @@ func main() {
 	go (func() {
 		defer wg.Done()
 		defer close(ch)
-		for {
-			produceCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			jobs, err := bot.produceTranslationMessages(produceCtx)
-			if err != nil {
-				log.ErrorContext(produceCtx, "running eval", "error", err)
-				sleepWithContext(ctx, time.Minute)
-				continue
-			}
-
-			for _, job := range jobs {
-				select {
-				case <-ctx.Done():
-					log.InfoContext(ctx, "context done, exiting producer")
-					return
-				case ch <- job:
-					log.InfoContext(ctx, "sent job", slog.String("channel_id", job.channelID), slog.Int64("game_id", job.gameID), slog.Int64("subscription_id", job.subscriptionID))
+		for ctx.Err() == nil {
+			produce := func() {
+				produceCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+				defer cancel()
+				jobs, err := bot.produceTranslationMessages(produceCtx)
+				log.Info("produced jobs", slog.Int("num_jobs", len(jobs)))
+				// Process err later because best effort
+				for _, job := range jobs {
+					select {
+					case <-ctx.Done():
+						log.InfoContext(ctx, "context done, exiting producer")
+						return
+					case ch <- job:
+						log.InfoContext(ctx, "sent job", slog.String("channel_id", job.channelID), slog.Int64("game_id", job.gameID), slog.Int64("subscription_id", job.subscriptionID))
+					}
 				}
-			}
 
-			sleepWithContext(ctx, time.Minute)
-			cancel()
+				if err != nil {
+					log.ErrorContext(produceCtx, "running eval", "error", err)
+				}
+
+				// Sleep for a full minute (unless shutdown received), so use the root ctx, regardless of err
+				sleepWithContext(ctx, time.Minute)
+			}
+			produce()
 		}
 	})()
 
 	// Consumers
 	log.InfoContext(ctx, "starting %d consumers", numConsumers)
+	wg.Add(int(numConsumers))
 	for i := range numConsumers {
-		wg.Add(1)
 		log := log.With("consumer_id", i)
 		go func() {
 			defer wg.Done()
 			for job := range ch {
-				processCtx, cancel := context.WithTimeout(ctx, time.Minute)
-				err := bot.consumeTranslationMessages(processCtx, job)
-				cancel()
-				if err != nil {
-					log.Error("consuming", "error", err)
+				consume := func() {
+					processCtx, cancel := context.WithTimeout(ctx, time.Minute)
+					defer cancel()
+					err := bot.consumeTranslationMessages(processCtx, job)
+					if err != nil {
+						log.Error("consuming", "error", err)
+					}
 				}
+				consume()
 			}
 			log.Info("consumer stopped")
 		}()
@@ -330,20 +338,24 @@ func main() {
 	wg.Add(1)
 	go (func() {
 		defer wg.Done()
-		for {
-			cleanupCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-			select {
-			case <-ctx.Done():
-				log.InfoContext(ctx, "context done, exiting consumer")
-				return
-			default:
-				err := bot.cleanupOldData(cleanupCtx)
-				cancel()
-				if err != nil {
-					log.Error("deleting old data", "error", err)
+		for ctx.Err() == nil {
+			cleanup := func() {
+				cleanupCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+				defer cancel()
+				select {
+				case <-ctx.Done():
+					log.InfoContext(ctx, "context done, exiting consumer")
+					return
+				default:
+					err := bot.cleanupOldData(cleanupCtx)
+					if err != nil {
+						log.Error("deleting old data", "error", err)
+					}
 				}
 			}
 
+			cleanup()
+			// Sleep for a full hour (unless shutdown received), so use the root ctx
 			sleepWithContext(ctx, time.Hour)
 		}
 	})()
@@ -359,14 +371,16 @@ func main() {
 	log.InfoContext(ctx, "shut down complete")
 }
 
+// This design avoids allocating a new timer for each iteration of select evaluation and prevents memory leaks.
 func sleepWithContext(ctx context.Context, dur time.Duration) {
-	for {
-		select {
-		case <-time.After(dur):
-			return
-		case <-ctx.Done():
-			return
-		}
+	timer := time.NewTimer(dur)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return
+	case <-ctx.Done():
+		return
 	}
 }
 
@@ -830,11 +844,11 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 		})
 	}
 	if err := eg.Wait(); err != nil {
-		// TODO: Best effort, even if there's an error with one job we should return as much as we can
-		return nil, fmt.Errorf("producing translation messages: %w", err)
+		err = fmt.Errorf("producing translation messages: %w", err)
 	}
 
-	return jobs, nil
+	// Best effort
+	return jobs, err
 }
 
 func containsForeignCharacters(s string) bool {
