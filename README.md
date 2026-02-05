@@ -8,7 +8,13 @@ LeagueOfRen monitors League of Legends players and automatically translates non-
 
 ### Name Origin
 
-The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean and Chinese characters meaning "person". I could never figure out the full names without looking them up, which inspired this bot.
+The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean and Chinese characters meaning "person". I could never figure out the full underlying meanings of the names without looking them up (despite me being Korean), which inspired this bot.
+
+## Other languages
+
+In theory, this is language-scalable but I started this project scoped down since 99% of foreign names I saw in NA were chinese and korean (I also live in NYC so I might just be region-scoped with a larger Asian population). In addition, the value of this feature rests entirely on the robustness and accuracy of the translations from the LLMs. Due to, what I think to be, a cultural phenomenon unique to Korean/Chinese communities where there's a gold mine of online content produced in their respective languages about league to provide enough context to LLM scrapers, I think these 2 languages specifically are well suited perhaps next to English to be potential language candidates for this project. I wonder if to support other languages, we'd have to use an intelligent model adapter based on the language.
+
+-
 
 ## Features
 
@@ -32,29 +38,35 @@ The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean a
 ## Quick Start
 
 ### 1. Prerequisites
-These will be installed with `make setup` on step 3. 
+
+These will be installed with `make setup` on step 3.
+
 - [Go 1.26+](https://go.dev/dl/)
 - [Docker](https://docs.docker.com/get-docker/)
 - [Atlas CLI](https://atlasgo.io/getting-started#installation): `brew install ariga/tap/atlas`
 
 ### 2. Get API Keys
 
-| Service | Purpose | Get it here |
-|---------|---------|-------------|
-| Discord Bot Token | Bot authentication | [Discord Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Token |
-| Riot API Key | Player/game data | [Riot Developer Portal](https://developer.riotgames.com/) → Register → Get API Key |
-| Anthropic API Key | AI translation (recommended) | [Anthropic Console](https://console.anthropic.com/) → API Keys |
-| Google AI API Key | AI translation (alternative) | [Google AI Studio](https://aistudio.google.com/app/apikey) → Get API Key |
+| Service           | Purpose                      | Get it here                                                                                             |
+| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Discord Bot Token | Bot authentication           | [Discord Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Token |
+| Riot API Key      | Player/game data             | [Riot Developer Portal](https://developer.riotgames.com/) → Register → Get API Key                      |
+| Anthropic API Key | AI translation (recommended) | [Anthropic Console](https://console.anthropic.com/) → API Keys                                          |
+| Google AI API Key | AI translation (alternative) | [Google AI Studio](https://aistudio.google.com/app/apikey) → Get API Key                                |
 
 ### 3. Clone and Setup
+
 #### If you're on Windows enable WSL
+
 ```
 wsl.exe --install
 ```
+
 Then install [Ubuntu subsystem from windows store](https://apps.microsoft.com/detail/9pdxgncfsczv?hl=en-US&gl=US)
 and open Start->Ubuntu after restarting. Run all commands below from this terminal.
 
 #### Install Go
+
 ```bash
 curl -LO https://go.dev/dl/go1.26rc2.linux-amd64.tar.gz && \
   rm -rf ~/go && \
