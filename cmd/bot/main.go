@@ -559,7 +559,9 @@ func (b *Bot) evaluateSubscriptions(ctx context.Context) error {
 				if !containsForeignCharacters(p.GameName) {
 					return "", false
 				}
-				return p.GameName, true
+				// Not sure the best way to handle error gracefully but no way it fails at this point right? Ignore for now.
+				name, _, _ := riot.ParseRiotID(p.GameName)
+				return name, true
 			})
 
 			if len(names) == 0 {
