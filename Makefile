@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build clean translate-test
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test
 
 # Default target
 help:
@@ -14,7 +14,11 @@ help:
 	@echo "  make run            - Run the bot locally"
 	@echo "  make watch          - Run the bot with live reload"
 	@echo "  make translate-test - Test translation (usage: make translate-test names=\"托儿索,페이커\")"
-	@echo "  make build          - Build the bot binary"
+	@echo "  make build          - Build the bot binary for current platform"
+	@echo "  make build-all      - Build for all platforms (Windows, Linux, macOS)"
+	@echo "  make build-windows  - Build Windows exe"
+	@echo "  make build-linux    - Build Linux binary"
+	@echo "  make build-darwin   - Build macOS binary"
 	@echo "  make clean          - Clean build artifacts"
 
 # Development setup
@@ -76,11 +80,31 @@ translate-test:
 	fi
 	go run cmd/translate-test/main.go -names "$(names)" -provider "$(or $(provider),anthropic)" -model "$(model)"
 
-# Build the bot
+# Build the bot for current platform
 build:
-	go build -o bin/bot cmd/bot/main.go
+	go build -o bin/leagueofren cmd/bot/main.go
+
+# Build for all platforms
+build-all: build-windows build-linux build-darwin
+	@echo "Built all platforms in bin/"
+
+# Build Windows exe
+build-windows:
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o bin/leagueofren-windows-amd64.exe cmd/bot/main.go
+	@echo "Built bin/leagueofren-windows-amd64.exe"
+
+# Build Linux binary
+build-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/leagueofren-linux-amd64 cmd/bot/main.go
+	@echo "Built bin/leagueofren-linux-amd64"
+
+# Build macOS binary
+build-darwin:
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/leagueofren-darwin-amd64 cmd/bot/main.go
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/leagueofren-darwin-arm64 cmd/bot/main.go
+	@echo "Built bin/leagueofren-darwin-amd64 and bin/leagueofren-darwin-arm64"
 
 # Clean build artifacts
 clean:
-	rm -rf bin/
+	rm -rf bin/ dist/
 	go clean

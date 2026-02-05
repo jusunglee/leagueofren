@@ -2,29 +2,28 @@ package riot
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jusunglee/leagueofren/internal/db"
 )
 
 type CachedClient struct {
-	client  *client
-	queries *db.Queries
+	client *client
+	repo   db.Repository
 }
 
-func NewCachedClient(apiKey string, queries *db.Queries) *CachedClient {
+func NewCachedClient(apiKey string, repo db.Repository) *CachedClient {
 	return &CachedClient{
-		client:  newClient(apiKey),
-		queries: queries,
+		client: newClient(apiKey),
+		repo:   repo,
 	}
 }
 
 func (c *CachedClient) GetAccountByRiotID(ctx context.Context, gameName, tagLine, region string) (Account, error) {
-	cached, err := c.queries.GetCachedAccount(ctx, db.GetCachedAccountParams{
+	cached, err := c.repo.GetCachedAccount(ctx, db.GetCachedAccountParams{
 		GameName: gameName,
 		TagLine:  tagLine,
 		Region:   region,
@@ -36,7 +35,7 @@ func (c *CachedClient) GetAccountByRiotID(ctx context.Context, gameName, tagLine
 			TagLine:  cached.TagLine,
 		}, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !db.IsNoRows(err) {
 		return Account{}, fmt.Errorf("account cache lookup failed: %w", err)
 	}
 
@@ -45,7 +44,7 @@ func (c *CachedClient) GetAccountByRiotID(ctx context.Context, gameName, tagLine
 		return Account{}, err
 	}
 
-	if err := c.queries.CacheAccount(ctx, db.CacheAccountParams{
+	if err := c.repo.CacheAccount(ctx, db.CacheAccountParams{
 		GameName: account.GameName,
 		TagLine:  account.TagLine,
 		Region:   region,
@@ -58,7 +57,7 @@ func (c *CachedClient) GetAccountByRiotID(ctx context.Context, gameName, tagLine
 }
 
 func (c *CachedClient) GetActiveGame(ctx context.Context, puuid, region string) (ActiveGame, error) {
-	cached, err := c.queries.GetCachedGameStatus(ctx, db.GetCachedGameStatusParams{
+	cached, err := c.repo.GetCachedGameStatus(ctx, db.GetCachedGameStatusParams{
 		Puuid:  puuid,
 		Region: region,
 	})
@@ -79,13 +78,13 @@ func (c *CachedClient) GetActiveGame(ctx context.Context, puuid, region string) 
 			Participants: participants,
 		}, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !db.IsNoRows(err) {
 		return ActiveGame{}, fmt.Errorf("game cache lookup failed: %w", err)
 	}
 
 	game, err := c.client.GetActiveGame(puuid, region)
 	if errors.Is(err, ErrNotInGame) {
-		if cacheErr := c.queries.CacheGameStatus(ctx, db.CacheGameStatusParams{
+		if cacheErr := c.repo.CacheGameStatus(ctx, db.CacheGameStatusParams{
 			Puuid:  puuid,
 			Region: region,
 			InGame: false,
@@ -103,11 +102,11 @@ func (c *CachedClient) GetActiveGame(ctx context.Context, puuid, region string) 
 		return ActiveGame{}, fmt.Errorf("failed to marshal participants: %w", err)
 	}
 
-	if err := c.queries.CacheGameStatus(ctx, db.CacheGameStatusParams{
+	if err := c.repo.CacheGameStatus(ctx, db.CacheGameStatusParams{
 		Puuid:        puuid,
 		Region:       region,
 		InGame:       true,
-		GameID:       pgtype.Int8{Int64: game.GameID, Valid: true},
+		GameID:       sql.NullInt64{Int64: game.GameID, Valid: true},
 		Participants: participantsJSON,
 	}); err != nil {
 		return ActiveGame{}, fmt.Errorf("failed to cache game status: %w", err)

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,8 +12,6 @@ import (
 	"unicode"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
@@ -32,7 +31,7 @@ type Config struct {
 type Bot struct {
 	log        *slog.Logger
 	session    *discordgo.Session
-	queries    *db.Queries
+	repo       db.Repository
 	riotClient *riot.CachedClient
 	translator *translation.Translator
 	config     Config
@@ -41,7 +40,7 @@ type Bot struct {
 func New(
 	log *slog.Logger,
 	session *discordgo.Session,
-	queries *db.Queries,
+	repo db.Repository,
 	riotClient *riot.CachedClient,
 	translator *translation.Translator,
 	config Config,
@@ -49,16 +48,14 @@ func New(
 	return &Bot{
 		log:        log,
 		session:    session,
-		queries:    queries,
+		repo:       repo,
 		riotClient: riotClient,
 		translator: translator,
 		config:     config,
 	}
 }
 
-// TODO: Support dockerization because I know people would want to run this on their local windows while also playing league
 // TODO: Support ignore lists
-// TODO: If limits get tight we can restrict one subscription signature per server, so you can't have duplicate subscriptions over different channels in the same server
 // TODO: metrics into grafana/lokiw
 // TODO: When https://github.com/golangci/golangci-lint/pull/6271 merges, enable exhaustruct and errcheck in golangci-lint
 
@@ -306,7 +303,7 @@ func (b *Bot) handleComponent(s *discordgo.Session, i *discordgo.InteractionCrea
 
 	switch customID {
 	case "feedback_good":
-		_, err := b.queries.CreateFeedback(ctx, db.CreateFeedbackParams{
+		_, err := b.repo.CreateFeedback(ctx, db.CreateFeedbackParams{
 			DiscordMessageID: messageID,
 			FeedbackText:     "👍",
 		})
@@ -368,7 +365,7 @@ func (b *Bot) handleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCr
 		}
 	}
 
-	_, err := b.queries.CreateFeedback(ctx, db.CreateFeedbackParams{
+	_, err := b.repo.CreateFeedback(ctx, db.CreateFeedbackParams{
 		DiscordMessageID: messageID,
 		FeedbackText:     correctionText,
 	})
@@ -420,7 +417,7 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) handlerResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	count, err := b.queries.CountSubscriptionsByServer(ctx, serverID)
+	count, err := b.repo.CountSubscriptionsByServer(ctx, serverID)
 	if count > b.config.MaxSubscriptionsPerServer {
 		return handlerResult{
 			Response: "❌ Already at maxium subscription count per server, please /unsubscribe to some before subscribing to more.",
@@ -458,13 +455,13 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) handlerResult {
 
 	canonicalName := fmt.Sprintf("%s#%s", account.GameName, account.TagLine)
 
-	_, err = b.queries.CreateSubscription(ctx, db.CreateSubscriptionParams{
+	_, err = b.repo.CreateSubscription(ctx, db.CreateSubscriptionParams{
 		DiscordChannelID: channelID,
 		LolUsername:      canonicalName,
 		Region:           region,
 		ServerID:         serverID,
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if db.IsNoRows(err) {
 		return handlerResult{
 			Response: fmt.Sprintf("⚠️ Already subscribed to **%s** (%s)", canonicalName, region),
 			Err:      newUserError(err),
@@ -500,7 +497,7 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) handlerResult {
 
 	canonicalName := fmt.Sprintf("%s#%s", gameName, tagLine)
 
-	rowsAffected, err := b.queries.DeleteSubscription(ctx, db.DeleteSubscriptionParams{
+	rowsAffected, err := b.repo.DeleteSubscription(ctx, db.DeleteSubscriptionParams{
 		DiscordChannelID: channelID,
 		LolUsername:      canonicalName,
 		Region:           region,
@@ -527,7 +524,7 @@ func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) handlerResult
 	defer cancel()
 	channelID := i.ChannelID
 
-	subs, err := b.queries.GetSubscriptionsByChannel(ctx, channelID)
+	subs, err := b.repo.GetSubscriptionsByChannel(ctx, channelID)
 	if err != nil {
 		return handlerResult{
 			Response: "❌ Failed to list subscriptions. Please try again later.",
@@ -589,13 +586,13 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 			return nil, fmt.Errorf("getting active game %w", err)
 		}
 
-		_, err = b.queries.GetEvalByGameAndSubscription(ctx,
+		_, err = b.repo.GetEvalByGameAndSubscription(ctx,
 			db.GetEvalByGameAndSubscriptionParams{
-				GameID:         pgtype.Int8{Int64: game.GameID, Valid: true},
+				GameID:         sql.NullInt64{Int64: game.GameID, Valid: true},
 				SubscriptionID: sub.ID,
 			})
 
-		if !errors.Is(err, pgx.ErrNoRows) {
+		if !db.IsNoRows(err) {
 			b.log.InfoContext(ctx, "game already evaluated", "subscription_id", sub.ID, "game_id", game.GameID)
 			continue
 		}
@@ -655,17 +652,17 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 	}
 
 	// TODO: do all this under a transaction because it's an invariant violation to create a eval but not update the denormalized subscription field
-	_, err = b.queries.CreateEval(ctx, db.CreateEvalParams{
+	_, err = b.repo.CreateEval(ctx, db.CreateEvalParams{
 		SubscriptionID:   job.subscriptionID,
 		EvalStatus:       "NEW_TRANSLATIONS",
-		DiscordMessageID: pgtype.Text{String: msg.ID, Valid: true},
-		GameID:           pgtype.Int8{Int64: job.gameID, Valid: true},
+		DiscordMessageID: sql.NullString{String: msg.ID, Valid: true},
+		GameID:           sql.NullInt64{Int64: job.gameID, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("creating eval record: %w", err)
 	}
 
-	err = b.queries.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
+	err = b.repo.UpdateSubscriptionLastEvaluatedAt(ctx, job.subscriptionID)
 	if err != nil {
 		return fmt.Errorf("updating subscription last evaluated at: %w", err)
 	}
@@ -681,7 +678,7 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 
 func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob, error) {
 	b.log.InfoContext(ctx, "starting eval loop...")
-	subs, err := b.queries.GetAllSubscriptions(ctx, 1000)
+	subs, err := b.repo.GetAllSubscriptions(ctx, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("getting all subscriptions %w", err)
 	}
@@ -763,13 +760,13 @@ func formatTranslationEmbed(username string, translations []translation.Translat
 
 func (b *Bot) cleanupOldData(ctx context.Context) error {
 	log := b.log.With("subsystem", "cleanup_old_data")
-	rows, err := b.queries.DeleteEvals(ctx, pgtype.Timestamptz{Valid: true, Time: time.Now().Add(-b.config.EvalExpirationDuration)})
+	rows, err := b.repo.DeleteEvals(ctx, time.Now().Add(-b.config.EvalExpirationDuration))
 	if err != nil {
 		return fmt.Errorf("deleting old evals: %w", err)
 	}
 	log.InfoContext(ctx, "Deleted rows", slog.Int64("rows", rows))
 
-	subs, err := b.queries.FindSubscriptionsWithExpiredNewestOnlineEval(ctx, pgtype.Timestamptz{Valid: true, Time: time.Now().Add(-b.config.OfflineActivityThreshold)})
+	subs, err := b.repo.FindSubscriptionsWithExpiredNewestOnlineEval(ctx, time.Now().Add(-b.config.OfflineActivityThreshold))
 	if len(subs) == 0 {
 		log.InfoContext(ctx, "No expired subs")
 		return nil
@@ -781,7 +778,7 @@ func (b *Bot) cleanupOldData(ctx context.Context) error {
 	subIds := lo.Map(subs, func(s db.FindSubscriptionsWithExpiredNewestOnlineEvalRow, _ int) int64 {
 		return s.SubscriptionID
 	})
-	count, err := b.queries.DeleteSubscriptions(ctx, subIds)
+	count, err := b.repo.DeleteSubscriptions(ctx, subIds)
 	if err != nil {
 		return fmt.Errorf("deleting expired subs: %w", err)
 	}

@@ -28,45 +28,71 @@ In theory, this is language-scalable but I started this project scoped down sinc
 ## Tech Stack
 
 - **Language**: Go 1.26
-- **Database**: PostgreSQL 16
+- **Database**: SQLite (standalone) or PostgreSQL 16 (development/production)
 - **Schema Management**: [Atlas](https://atlasgo.io/) (declarative migrations)
 - **Discord**: WebSocket Gateway ([discordgo](https://github.com/bwmarrin/discordgo))
 - **APIs**: Riot Games API, Anthropic API, Google AI API
 - **Code Generation**: [sqlc](https://sqlc.dev/) (type-safe SQL)
-- **Deployment**: Railway
+- **TUI**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (first-run setup wizard)
+- **Releases**: [GoReleaser](https://goreleaser.com/) + GitHub Actions
+- **Deployment**: Railway, Docker, or standalone binary
 
 ## Quick Start
 
-### 1. Prerequisites
+### Option A: Windows Users (Just Run It)
 
-These will be installed with `make setup` on step 3.
+If you're on Windows and don't want to compile anything:
 
-- [Go 1.26+](https://go.dev/dl/)
-- [Docker](https://docs.docker.com/get-docker/)
-- [Atlas CLI](https://atlasgo.io/getting-started#installation): `brew install ariga/tap/atlas`
+1. **Download** the latest `leagueofren-windows-amd64.exe` from [Releases](https://github.com/jusunglee/leagueofren/releases)
 
-### 2. Get API Keys
+2. **Double-click** `leagueofren-windows-amd64.exe` to run
 
-| Service           | Purpose                      | Get it here                                                                                             |
-| ----------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Discord Bot Token | Bot authentication           | [Discord Developer Portal](https://discord.com/developers/applications) → New Application → Bot → Token |
-| Riot API Key      | Player/game data             | [Riot Developer Portal](https://developer.riotgames.com/) → Register → Get API Key                      |
-| Anthropic API Key | AI translation (recommended) | [Anthropic Console](https://console.anthropic.com/) → API Keys                                          |
-| Google AI API Key | AI translation (alternative) | [Google AI Studio](https://aistudio.google.com/app/apikey) → Get API Key                                |
+3. **Follow the setup wizard** - On first launch, an interactive wizard walks you through:
+   - Discord bot token setup (with link to Developer Portal)
+   - Riot API key setup (with link to Developer Portal)
+   - LLM provider choice (Anthropic or Google)
+   - LLM API key setup
 
-### 3. Clone and Setup
+The wizard saves your configuration to `.env` automatically. The bot creates a local SQLite database - no PostgreSQL or Docker needed.
 
-#### If you're on Windows enable WSL
+---
 
-```
+### Option B: Developers (Build from Source)
+
+#### 1. Setup Environment
+
+<details>
+<summary><b>Windows (WSL required)</b></summary>
+
+Enable WSL and install Ubuntu:
+```powershell
 wsl.exe --install
 ```
 
-Then install [Ubuntu subsystem from windows store](https://apps.microsoft.com/detail/9pdxgncfsczv?hl=en-US&gl=US)
-and open Start->Ubuntu after restarting. Run all commands below from this terminal.
+Install [Ubuntu from Microsoft Store](https://apps.microsoft.com/detail/9pdxgncfsczv) and open it after restarting.
 
-#### Install Go
+**All commands below should be run inside the Ubuntu terminal.**
 
+</details>
+
+<details>
+<summary><b>macOS</b></summary>
+
+Install Homebrew if you haven't:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+</details>
+
+#### 2. Install Go
+
+**macOS:**
+```bash
+brew install go
+```
+
+**Linux/WSL:**
 ```bash
 curl -LO https://go.dev/dl/go1.26rc2.linux-amd64.tar.gz && \
   rm -rf ~/go && \
@@ -76,29 +102,40 @@ curl -LO https://go.dev/dl/go1.26rc2.linux-amd64.tar.gz && \
   source ~/.bashrc
 ```
 
+#### 3. Clone and Setup
+
 ```bash
 git clone https://github.com/jusunglee/leagueofren.git
 cd leagueofren
-
-# Install tools (Atlas, air for hot reload)
-
 make setup
-
 ```
 
-### 4. Run the Bot
+#### 4. Run the Bot
 
 ```bash
 make run
+```
 
-# Or with hot reload for development
-make watch
+On first run, an interactive setup wizard walks you through configuring:
+- Discord bot token
+- Riot API key
+- LLM provider (Anthropic or Google)
+- LLM API key
+
+The wizard saves your configuration to `.env` automatically.
+
+**With PostgreSQL (optional, for development):**
+```bash
+make db-up        # Start PostgreSQL in Docker
+make schema-apply # Apply database schema
+# Edit .env to set DATABASE_URL to your PostgreSQL connection string
+make run
 ```
 
 ## Development Commands
 
 ```bash
-# Database
+# Database (PostgreSQL)
 make db-up              # Start PostgreSQL container
 make db-down            # Stop PostgreSQL container
 make db-logs            # View PostgreSQL logs
@@ -114,7 +151,13 @@ make sqlc               # Regenerate Go code from SQL queries
 # Run
 make run                # Run the bot
 make watch              # Run with hot reload (air)
-make build              # Build binary to bin/bot
+
+# Build
+make build              # Build binary for current platform
+make build-all          # Build for Windows, Linux, macOS
+make build-windows      # Build Windows exe only
+make build-linux        # Build Linux binary only
+make build-darwin       # Build macOS binaries (amd64 + arm64)
 
 # Testing
 make translate-test names="托儿索,페이커"                    # Test with Anthropic (default)
@@ -198,6 +241,7 @@ leagueofren/
 │   ├── google/                 # Google AI API client
 │   ├── llm/                    # LLM interface + utilities
 │   ├── riot/                   # Riot API client with caching
+│   ├── setup/                  # First-run setup wizard (bubbletea TUI)
 │   ├── translation/            # Translation service
 │   └── db/                     # Database layer (sqlc generated)
 ├── schema.sql                  # Database schema (source of truth)

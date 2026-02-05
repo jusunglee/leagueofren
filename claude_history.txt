@@ -315,3 +315,28 @@ Can you code review my producer consumer model? This is my first attempt at usin
 Move everything that's bot specific into a bot package. The main.go should basically only contain the main function.
 Let's use https://github.com/peterbourgon/ff for the flags, they have a neat feature where cli-flags and env vars are "intermingled" (taking passed in flags as higher pri) so we can leverage the .env file we have but consume them more cleanly. They have better sane defaults and the declaration for these flags are way cleaner and more readable.
 Let's separate main into main and mainE. mainE contains most of current main but returns an err instead of os.Exit or any other kind of panics. main should get an err from mainE and only os.Exit from there. The goal is that there's no exits/panics in mainE, and only 1 in main
+
+I anticipate that a lot of my users are on Windows but not programmer-savvy       
+  at all to build + compile this from scratch. I tried to make this way easier     
+  with the bubbletea TUI to walk through the setup, but I think even enabling       
+  LFS can be too big of a gap. How realistic is it to be able to build a single     
+   AMD64 .exe that runs the database and bot locally, so no need for containers     
+   and all that. Ideally this would be part of the official "releases" workflow     
+   on the github repo with version numbers. I still want to make sure that it's     
+   possible to build and compile locally, and even run on docker.   
+
+   Why does this require us to switch to sqlite?    
+
+   Can't we make an exe that forks twice, once for the go process and once for       
+  the postgres process?   
+
+  Let's scrap the exe approach, how feasible is it to bundle everything into a      
+  docker set so that windows users can "just download docker" and "just run"       
+  the build?       
+
+  Okay I give up. Let's plan out the SQLite migration, and the process to do        
+  github releases with exes overall. 2026-02-05 16:36:48 - SQLite migration and GitHub releases implementation
+2026-02-05 16:42:34 - Updated README and Makefile with new build system
+2026-02-05 - Implement the following plan: Setup Wizard Implementation (bubbletea TUI that runs on first launch when no .env exists)
+2026-02-05 - Update the README with this new flow, most notably users shouldn't have to create a .env file manually, for either windows release or for build from source.
+2026-02-05 - Is it possible to create a github action that will build everything + cut a release? (already exists, just needed to fix go version format for RC)

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,13 +16,22 @@ import (
 	"github.com/jusunglee/leagueofren/internal/anthropic"
 	"github.com/jusunglee/leagueofren/internal/bot"
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/db/postgres"
+	"github.com/jusunglee/leagueofren/internal/db/sqlite"
 	"github.com/jusunglee/leagueofren/internal/google"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
+	"github.com/jusunglee/leagueofren/internal/setup"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
+)
+
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 func main() {
@@ -33,6 +43,18 @@ func main() {
 }
 
 func mainE() error {
+	if setup.NeedsSetup() {
+		fmt.Println("No .env file found. Starting setup wizard...")
+		completed, err := setup.Run()
+		if err != nil {
+			return fmt.Errorf("setup wizard failed: %w", err)
+		}
+		if !completed {
+			return errors.New("setup cancelled")
+		}
+		fmt.Println("\nConfiguration saved! Starting bot...\n")
+	}
+
 	_ = godotenv.Load()
 
 	fs := ff.NewFlagSet("leagueofren")
@@ -96,21 +118,31 @@ func mainE() error {
 
 	ctx, cancel := context.WithCancelCause(context.Background())
 
-	pool, err := db.NewPool(ctx, *databaseURL)
-	if err != nil {
-		return fmt.Errorf("creating connection pool: %w", err)
-	}
-	defer pool.Close()
-
 	log := logger.New()
-	log.InfoContext(ctx, "connected to database")
 
-	queries := db.New(pool)
-	translator := translation.NewTranslator(client, queries, *llmProvider, *llmModel)
-	riotClient := riot.NewCachedClient(*riotAPIKey, queries)
+	var repo db.Repository
+	if isSQLite(*databaseURL) {
+		sqliteRepo, err := sqlite.New(ctx, *databaseURL)
+		if err != nil {
+			return fmt.Errorf("creating SQLite database: %w", err)
+		}
+		repo = sqliteRepo
+		log.InfoContext(ctx, "connected to SQLite database", "path", *databaseURL)
+	} else {
+		pgRepo, err := postgres.New(ctx, *databaseURL)
+		if err != nil {
+			return fmt.Errorf("creating PostgreSQL connection: %w", err)
+		}
+		repo = pgRepo
+		log.InfoContext(ctx, "connected to PostgreSQL database")
+	}
+	defer repo.Close()
+
+	translator := translation.NewTranslator(client, repo, *llmProvider, *llmModel)
+	riotClient := riot.NewCachedClient(*riotAPIKey, repo)
 	log.InfoContext(ctx, "riot API client initialized with caching")
 
-	b := bot.New(log, dg, queries, riotClient, translator, bot.Config{
+	b := bot.New(log, dg, repo, riotClient, translator, bot.Config{
 		MaxSubscriptionsPerServer:    *maxSubscriptionsPerServer,
 		EvaluateSubscriptionsTimeout: *evaluateSubscriptionsTimeout,
 		EvalExpirationDuration:       *evalExpirationDuration,
@@ -133,4 +165,14 @@ func mainE() error {
 	}()
 
 	return b.Run(ctx, cancel)
+}
+
+func isSQLite(url string) bool {
+	if strings.HasPrefix(url, "sqlite://") {
+		return true
+	}
+	if strings.HasSuffix(url, ".db") || strings.HasSuffix(url, ".sqlite") || strings.HasSuffix(url, ".sqlite3") {
+		return true
+	}
+	return false
 }

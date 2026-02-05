@@ -12,7 +12,7 @@ import (
 
 type Translator struct {
 	llm      llm.Client
-	queries  *db.Queries
+	repo     db.Repository
 	provider string
 	model    string
 }
@@ -23,10 +23,10 @@ type Translation struct {
 	Explanation string `json:"explanation,omitempty"`
 }
 
-func NewTranslator(client llm.Client, queries *db.Queries, provider, model string) *Translator {
+func NewTranslator(client llm.Client, repo db.Repository, provider, model string) *Translator {
 	return &Translator{
 		llm:      client,
-		queries:  queries,
+		repo:     repo,
 		provider: provider,
 		model:    model,
 	}
@@ -49,7 +49,7 @@ func (t *Translator) TranslateUsernames(ctx context.Context, usernames []string)
 		return nil, nil
 	}
 
-	cached, err := t.queries.GetTranslations(ctx, usernames)
+	cached, err := t.repo.GetTranslations(ctx, usernames)
 	if err != nil {
 		return nil, fmt.Errorf("cache lookup failed: %w", err)
 	}
@@ -97,7 +97,7 @@ func (t *Translator) TranslateUsernames(ctx context.Context, usernames []string)
 
 	for _, tr := range translations {
 		composed := composeTranslation(tr)
-		_, err := t.queries.CreateTranslation(ctx, db.CreateTranslationParams{
+		_, err := t.repo.CreateTranslation(ctx, db.CreateTranslationParams{
 			Username:    tr.Original,
 			Translation: composed,
 			Provider:    t.provider,
