@@ -29,20 +29,20 @@ type Config struct {
 }
 
 type Bot struct {
-	log        *slog.Logger
-	session    *discordgo.Session
+	log        Logger
+	session    DiscordSession
 	repo       db.Repository
-	riotClient *riot.CachedClient
-	translator *translation.Translator
+	riotClient RiotClient
+	translator Translator
 	config     Config
 }
 
 func New(
-	log *slog.Logger,
-	session *discordgo.Session,
+	log Logger,
+	session DiscordSession,
 	repo db.Repository,
-	riotClient *riot.CachedClient,
-	translator *translation.Translator,
+	riotClient RiotClient,
+	translator Translator,
 	config Config,
 ) *Bot {
 	return &Bot{
@@ -103,7 +103,7 @@ func (b *Bot) registerCommands(ctx context.Context) error {
 	guildID := b.config.GuildID
 	if guildID != "" {
 		b.log.InfoContext(ctx, "registering commands to guild", "guild_id", guildID)
-		_, err := b.session.ApplicationCommandBulkOverwrite(b.session.State.User.ID, "", []*discordgo.ApplicationCommand{})
+		_, err := b.session.ApplicationCommandBulkOverwrite(b.session.GetUserID(), "", []*discordgo.ApplicationCommand{})
 		if err != nil {
 			b.log.WarnContext(ctx, "failed to clear global commands", "error", err)
 		} else {
@@ -113,7 +113,7 @@ func (b *Bot) registerCommands(ctx context.Context) error {
 		b.log.InfoContext(ctx, "registering commands globally (may take up to 1 hour to propagate)")
 	}
 
-	_, err := b.session.ApplicationCommandBulkOverwrite(b.session.State.User.ID, guildID, commands)
+	_, err := b.session.ApplicationCommandBulkOverwrite(b.session.GetUserID(), guildID, commands)
 	if err != nil {
 		return fmt.Errorf("bulk overwrite commands: %w", err)
 	}

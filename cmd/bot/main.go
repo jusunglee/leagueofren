@@ -142,14 +142,21 @@ func mainE() error {
 	riotClient := riot.NewCachedClient(*riotAPIKey, repo)
 	log.InfoContext(ctx, "riot API client initialized with caching")
 
-	b := bot.New(log, dg, repo, riotClient, translator, bot.Config{
-		MaxSubscriptionsPerServer:    *maxSubscriptionsPerServer,
-		EvaluateSubscriptionsTimeout: *evaluateSubscriptionsTimeout,
-		EvalExpirationDuration:       *evalExpirationDuration,
-		OfflineActivityThreshold:     *offlineActivityThreshold,
-		NumConsumers:                 *numConsumers,
-		GuildID:                      *guildID,
-	})
+	b := bot.New(
+		bot.NewLogger(log),
+		bot.NewDiscordSession(dg),
+		repo,
+		bot.NewRiotClient(riotClient),
+		bot.NewTranslator(translator),
+		bot.Config{
+			MaxSubscriptionsPerServer:    *maxSubscriptionsPerServer,
+			EvaluateSubscriptionsTimeout: *evaluateSubscriptionsTimeout,
+			EvalExpirationDuration:       *evalExpirationDuration,
+			OfflineActivityThreshold:     *offlineActivityThreshold,
+			NumConsumers:                 *numConsumers,
+			GuildID:                      *guildID,
+		},
+	)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
