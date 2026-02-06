@@ -363,7 +363,7 @@ export function Leaderboard() {
                   : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
               }`}
             >
-              <SortIcon type={opt.icon} filled={isActive} color={isActive ? 'white' : opt.color} />
+              <SortIcon type={opt.icon} filled={isActive} color={opt.color} />
               {opt.label}
             </button>
           )
