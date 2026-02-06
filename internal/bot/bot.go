@@ -26,6 +26,7 @@ type Config struct {
 	OfflineActivityThreshold     time.Duration
 	NumConsumers                 int64
 	GuildID                      string
+	JobBufferSize                int
 }
 
 type Bot struct {
@@ -76,7 +77,7 @@ func (b *Bot) Run(ctx context.Context, cancel context.CancelCauseFunc) error {
 		return fmt.Errorf("registering commands: %w", err)
 	}
 
-	ch := make(chan sendMessageJob, 20)
+	ch := make(chan sendMessageJob, b.config.JobBufferSize)
 	var wg sync.WaitGroup
 
 	wg.Add(1)
