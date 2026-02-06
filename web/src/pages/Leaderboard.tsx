@@ -273,6 +273,11 @@ function TranslationCard({ t, index, onVote, onFeedback }: {
         {t.explanation && (
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
         )}
+        {t.first_seen && (
+          <p className="mono-font text-[10px] text-[var(--foreground-muted)] mt-1 tracking-wide" style={{ opacity: 0.6 }}>
+            first seen {new Date(t.first_seen).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
+        )}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
             <span className="text-sm leading-none" aria-hidden="true">{REGION_EMOJI[t.region] || '🌍'}</span>

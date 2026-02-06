@@ -174,7 +174,7 @@ RETURNING *;
 -- name: GetPublicTranslation :one
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE pt.id = $1;
@@ -182,7 +182,7 @@ WHERE pt.id = $1;
 -- name: GetPublicTranslationByUsername :one
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE pt.username = $1;
@@ -190,7 +190,7 @@ WHERE pt.username = $1;
 -- name: ListPublicTranslationsNew :many
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE ($1::text = '' OR p.region = $1)
@@ -201,7 +201,7 @@ LIMIT $3 OFFSET $4;
 -- name: ListPublicTranslationsTop :many
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE ($1::text = '' OR p.region = $1)

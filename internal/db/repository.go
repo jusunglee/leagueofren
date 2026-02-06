@@ -44,6 +44,7 @@ type PublicTranslation struct {
 	Upvotes      int32
 	Downvotes    int32
 	CreatedAt    time.Time
+	FirstSeen    time.Time
 }
 
 // Vote represents an IP-hashed vote on a public translation
