@@ -36,6 +36,7 @@ type Bot struct {
 	riotClient    RiotClient
 	translator    Translator
 	config        Config
+	rateLimiter   *RateLimiter
 }
 
 func New(
@@ -55,6 +56,7 @@ func New(
 		riotClient:    riotClient,
 		translator:    translator,
 		config:        config,
+		rateLimiter:   NewRateLimiter(),
 	}
 }
 
@@ -271,6 +273,12 @@ func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
+
+	if i.Member != nil && i.Member.User != nil && !b.rateLimiter.Allow(i.Member.User.ID) {
+		b.respond(s, i, "\u26a0\ufe0f You're sending commands too fast. Please wait a moment.")
+		return
+	}
+
 	var result handlerResult
 	cmd := i.ApplicationCommandData().Name
 
