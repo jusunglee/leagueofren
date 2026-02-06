@@ -87,6 +87,11 @@ func (m *MockDiscordSession) GetUserID() string {
 	return ret.String(0)
 }
 
+func (m *MockDiscordSession) UserChannelPermissions(userID, channelID string, options ...discordgo.RequestOption) (int64, error) {
+	ret := m.Called(userID, channelID, options)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
 type MockRepository struct {
 	mock.Mock
 }
