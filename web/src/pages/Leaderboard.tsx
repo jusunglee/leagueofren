@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, Flame, Sparkles, Trophy } from 'lucide-react'
+import { ChevronUp, ChevronDown, Flame, Sparkles, Trophy, ExternalLink, MessageCircleQuestion } from 'lucide-react'
 import { listTranslations, vote } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
 
-const SORT_OPTIONS: { value: SortOption; label: string; icon: typeof Flame }[] = [
-  { value: 'hot', label: 'Hot', icon: Flame },
-  { value: 'new', label: 'New', icon: Sparkles },
-  { value: 'top', label: 'Top', icon: Trophy },
+const SORT_OPTIONS: { value: SortOption; label: string; icon: typeof Flame; color: string }[] = [
+  { value: 'hot', label: 'Hot', icon: Flame, color: '#E85D75' },
+  { value: 'new', label: 'New', icon: Sparkles, color: '#FFD93D' },
+  { value: 'top', label: 'Top', icon: Trophy, color: '#F2A65A' },
 ]
 
 const PERIOD_OPTIONS: { value: PeriodOption; label: string }[] = [
@@ -27,6 +27,16 @@ const BADGE_COLORS = [
   'var(--sky)', 'var(--lavender)', 'var(--secondary)',
 ]
 
+const REGION_EMOJI: Record<string, string> = {
+  NA: '🇺🇸', EUW: '🇪🇺', EUNE: '🇪🇺', KR: '🇰🇷', JP: '🇯🇵',
+  BR: '🇧🇷', LAN: '🌎', LAS: '🌎', OCE: '🇦🇺', TR: '🇹🇷', RU: '🇷🇺', TW: '🇹🇼',
+}
+
+const LANGUAGE_EMOJI: Record<string, string> = {
+  korean: '🇰🇷',
+  chinese: '🇨🇳',
+}
+
 function RankBadge({ index }: { index: number }) {
   const color = BADGE_COLORS[index % BADGE_COLORS.length]
   return (
@@ -38,6 +48,21 @@ function RankBadge({ index }: { index: number }) {
       <span className="pixel-font text-[8px] text-white leading-none">{index + 1}</span>
     </div>
   )
+}
+
+function buildLearnMoreUrl(username: string, translation: string, explanation: string | null) {
+  const prompt = `Tell me more about the League of Legends summoner name "${username}". It translates to "${translation}"${explanation ? ` (${explanation})` : ''}. What's the cultural context, any references to games, anime, literature, or memes? Is this a common naming pattern?`
+  return `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`
+}
+
+function buildOpggUrl(username: string, region: string) {
+  const regionSlug = region.toLowerCase()
+  return `https://www.op.gg/summoners/${regionSlug}/${encodeURIComponent(username)}`
+}
+
+function buildPorofessorUrl(username: string, region: string) {
+  const regionSlug = region.toLowerCase()
+  return `https://www.porofessor.gg/live/${regionSlug}/${encodeURIComponent(username)}`
 }
 
 function TranslationCard({ t, index, onVote }: {
@@ -93,17 +118,50 @@ function TranslationCard({ t, index, onVote }: {
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
         )}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase">
+          {/* Region badge with flag */}
+          <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
+            <span className="text-sm leading-none" aria-hidden="true">{REGION_EMOJI[t.region] || '🌍'}</span>
             {t.region}
           </span>
-          <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase">
+          {/* Language badge with flag */}
+          <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
+            <span className="text-sm leading-none" aria-hidden="true">{LANGUAGE_EMOJI[t.language] || '🌐'}</span>
             {t.language}
           </span>
-          {t.riot_verified && (
-            <span className="pixel-font text-[10px] px-2 py-0.5 bg-[var(--secondary)] text-white border-2 border-[var(--border)] rounded-[4px] tracking-wide">
-              &#10003; Verified
-            </span>
-          )}
+
+          {/* Spacer for link badges */}
+          <span className="hidden lg:inline w-px h-4 bg-[var(--border-light)]" />
+
+          {/* OP.GG badge */}
+          <a
+            href={buildOpggUrl(t.username, t.region)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--violet)] hover:text-white hover:border-[var(--border)] transition-all duration-150"
+          >
+            <ExternalLink size={10} strokeWidth={2.5} />
+            OP.GG
+          </a>
+          {/* Porofessor badge */}
+          <a
+            href={buildPorofessorUrl(t.username, t.region)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--sky)] hover:text-white hover:border-[var(--border)] transition-all duration-150"
+          >
+            <ExternalLink size={10} strokeWidth={2.5} />
+            Porofessor
+          </a>
+          {/* Learn More (ChatGPT) */}
+          <a
+            href={buildLearnMoreUrl(t.username, t.translation, t.explanation)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--accent)] hover:text-[var(--background)] hover:border-[var(--border)] transition-all duration-150"
+          >
+            <MessageCircleQuestion size={10} strokeWidth={2.5} />
+            Learn More
+          </a>
         </div>
       </div>
     </div>
@@ -146,9 +204,8 @@ export function Leaderboard() {
     <div className="space-y-6">
       <SectionMarker label="Rankings" />
 
-      {/* Controls row — all inline on desktop */}
+      {/* Controls row */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Sort Tabs */}
         {SORT_OPTIONS.map(opt => {
           const Icon = opt.icon
           return (
@@ -161,13 +218,12 @@ export function Leaderboard() {
                   : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
               }`}
             >
-              <Icon size={14} strokeWidth={2.5} />
+              <Icon size={14} strokeWidth={2.5} style={{ color: sort === opt.value ? 'white' : opt.color }} />
               {opt.label}
             </button>
           )
         })}
 
-        {/* Period (inline, shown when top) */}
         {sort === 'top' && (
           <>
             <div className="w-px h-6 bg-[var(--border-light)]" />
@@ -187,34 +243,35 @@ export function Leaderboard() {
           </>
         )}
 
-        {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Filters (right-aligned on desktop) */}
-        <select
-          value={region}
-          onChange={e => { setRegion(e.target.value); setPage(1) }}
-          className="pixel-border bg-[var(--card)] px-3 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
-        >
-          <option value="">All Regions</option>
-          {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <select
-          value={language}
-          onChange={e => { setLanguage(e.target.value); setPage(1) }}
-          className="pixel-border bg-[var(--card)] px-3 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
-        >
-          <option value="">All Languages</option>
-          {LANGUAGES.map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
-        </select>
-        {(region || language) && (
-          <button
-            onClick={() => { setRegion(''); setLanguage(''); setPage(1) }}
-            className="text-xs px-3 py-1.5 border-2 border-dashed border-[var(--border-light)] rounded-[4px] text-[var(--foreground-muted)] hover:border-solid hover:bg-[var(--muted)] transition-all"
+        {/* Filters with more spacing */}
+        <div className="flex items-center gap-4">
+          <select
+            value={region}
+            onChange={e => { setRegion(e.target.value); setPage(1) }}
+            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
           >
-            Clear
-          </button>
-        )}
+            <option value="">All Regions</option>
+            {REGIONS.map(r => <option key={r} value={r}>{REGION_EMOJI[r] || ''} {r}</option>)}
+          </select>
+          <select
+            value={language}
+            onChange={e => { setLanguage(e.target.value); setPage(1) }}
+            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
+          >
+            <option value="">All Languages</option>
+            {LANGUAGES.map(l => <option key={l} value={l}>{LANGUAGE_EMOJI[l] || ''} {l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
+          </select>
+          {(region || language) && (
+            <button
+              onClick={() => { setRegion(''); setLanguage(''); setPage(1) }}
+              className="text-xs px-3 py-1.5 border-2 border-dashed border-[var(--border-light)] rounded-[4px] text-[var(--foreground-muted)] hover:border-solid hover:bg-[var(--muted)] transition-all"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Translation Cards */}
