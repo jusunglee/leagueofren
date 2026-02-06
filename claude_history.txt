@@ -457,3 +457,8 @@ Dark mode Celeste palette (violets/blues), fix responsive layout to prioritize d
 Celeste dark palette, desktop-first responsive, remove hero, keep banner + submit button
 Filled sort icons, official op.gg/porofessor icons, add rank to schema
 Split players table + background worker for rank/mastery refresh
+Cookie-based vote fingerprinting with IP rate limit cap
+Work on Phase 2: Bot integration (opt-in config, Share button, submission to web API)
+Option A: Server-side re-translation — validate username via Riot, run own LLM translation
+Phase 3: Admin feedback viewer page + SEO meta tags
+Phase 4: Remove admin, embed frontend, Dockerfiles, docker-compose for DO droplet
