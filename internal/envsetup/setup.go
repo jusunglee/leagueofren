@@ -20,6 +20,7 @@ const (
 	stepRiot
 	stepLLMProvider
 	stepLLMKey
+	stepWebsiteShare
 	stepConfirm
 )
 
@@ -55,6 +56,7 @@ type model struct {
 	riotAPIKey   string
 	llmProvider  string
 	llmAPIKey    string
+	shareWebsite bool
 	input        string
 	err          error
 	width        int
@@ -154,6 +156,16 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.llmAPIKey = key
+		m.step = stepWebsiteShare
+		m.input = ""
+
+	case stepWebsiteShare:
+		choice := strings.TrimSpace(strings.ToLower(m.input))
+		if choice == "y" || choice == "yes" || choice == "" {
+			m.shareWebsite = true
+		} else {
+			m.shareWebsite = false
+		}
 		m.step = stepConfirm
 		m.input = ""
 
@@ -172,6 +184,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.riotAPIKey = ""
 			m.llmProvider = ""
 			m.llmAPIKey = ""
+			m.shareWebsite = false
 		}
 	}
 
@@ -196,8 +209,11 @@ func (m model) writeEnvFile() error {
 		"LLM_PROVIDER=" + sanitizeValue(m.llmProvider),
 		"LLM_MODEL=" + llmModel,
 		llmKeyName + "=" + sanitizeValue(m.llmAPIKey),
-		"",
 	}
+	if m.shareWebsite {
+		lines = append(lines, "WEBSITE_URL=https://leagueofren.com")
+	}
+	lines = append(lines, "")
 	content := strings.Join(lines, "\r\n")
 
 	return os.WriteFile(".env", []byte(content), 0600)
@@ -297,6 +313,20 @@ func (m model) View() string {
 			s.WriteString("\n" + errorStyle.Render(m.err.Error()))
 		}
 
+	case stepWebsiteShare:
+		s.WriteString(titleStyle.Render("Step 5: Share Translations"))
+		s.WriteString("\n\n")
+		s.WriteString("Would you like to share your translations with " + linkStyle.Render("leagueofren.com") + "?\n\n")
+		s.WriteString("  When enabled, translations captured from your games will be submitted\n")
+		s.WriteString("  to the community leaderboard. No personal data is shared.\n")
+		s.WriteString("\n")
+		s.WriteString(labelStyle.Render("Share translations? [Y/n]:"))
+		s.WriteString("\n")
+		s.WriteString("> " + inputStyle.Render(m.input))
+		if m.err != nil {
+			s.WriteString("\n" + errorStyle.Render(m.err.Error()))
+		}
+
 	case stepConfirm:
 		s.WriteString(titleStyle.Render("Configuration Complete"))
 		s.WriteString("\n\n")
@@ -306,6 +336,11 @@ func (m model) View() string {
 		s.WriteString("  Riot API:     " + successStyle.Render(maskToken(m.riotAPIKey)) + "\n")
 		s.WriteString("  LLM Provider: " + successStyle.Render(m.llmProvider) + "\n")
 		s.WriteString("  LLM API Key:  " + successStyle.Render(maskToken(m.llmAPIKey)) + "\n")
+		shareText := "No"
+		if m.shareWebsite {
+			shareText = "Yes (leagueofren.com)"
+		}
+		s.WriteString("  Share:        " + successStyle.Render(shareText) + "\n")
 		s.WriteString("\n")
 		s.WriteString(labelStyle.Render("Save this configuration? [Y/n]:"))
 		s.WriteString("\n")
