@@ -129,3 +129,84 @@ DELETE FROM translations WHERE created_at < $1;
 
 -- name: DeleteOldFeedback :execrows
 DELETE FROM feedback WHERE created_at < $1;
+
+-- ===========================================
+-- Companion Website Queries
+-- ===========================================
+
+-- name: UpsertPublicTranslation :one
+INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (username) DO UPDATE SET
+    translation = EXCLUDED.translation,
+    explanation = EXCLUDED.explanation,
+    language = EXCLUDED.language,
+    region = EXCLUDED.region,
+    source_bot_id = EXCLUDED.source_bot_id,
+    riot_verified = EXCLUDED.riot_verified
+RETURNING *;
+
+-- name: GetPublicTranslation :one
+SELECT * FROM public_translations WHERE id = $1;
+
+-- name: GetPublicTranslationByUsername :one
+SELECT * FROM public_translations WHERE username = $1;
+
+-- name: ListPublicTranslationsNew :many
+SELECT * FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2)
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $4;
+
+-- name: ListPublicTranslationsTop :many
+SELECT * FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2)
+  AND created_at > $5
+ORDER BY (upvotes - downvotes) DESC, created_at DESC
+LIMIT $3 OFFSET $4;
+
+-- name: CountPublicTranslations :one
+SELECT COUNT(*) FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2);
+
+-- name: IncrementUpvotes :exec
+UPDATE public_translations SET upvotes = upvotes + 1 WHERE id = $1;
+
+-- name: DecrementUpvotes :exec
+UPDATE public_translations SET upvotes = upvotes - 1 WHERE id = $1;
+
+-- name: IncrementDownvotes :exec
+UPDATE public_translations SET downvotes = downvotes + 1 WHERE id = $1;
+
+-- name: DecrementDownvotes :exec
+UPDATE public_translations SET downvotes = downvotes - 1 WHERE id = $1;
+
+-- name: UpsertVote :one
+INSERT INTO votes (translation_id, ip_hash, vote)
+VALUES ($1, $2, $3)
+ON CONFLICT (translation_id, ip_hash) DO UPDATE SET vote = $3
+RETURNING *;
+
+-- name: GetVote :one
+SELECT * FROM votes WHERE translation_id = $1 AND ip_hash = $2;
+
+-- name: DeleteVote :execrows
+DELETE FROM votes WHERE translation_id = $1 AND ip_hash = $2;
+
+-- name: CreatePublicFeedback :one
+INSERT INTO public_feedback (translation_id, ip_hash, feedback_text)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: ListPublicFeedback :many
+SELECT pf.*, pt.username, pt.translation
+FROM public_feedback pf
+JOIN public_translations pt ON pt.id = pf.translation_id
+ORDER BY pf.created_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: CountPublicFeedback :one
+SELECT COUNT(*) FROM public_feedback;
