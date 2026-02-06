@@ -74,6 +74,7 @@ func mainE() error {
 		evalExpirationDuration       = fs.DurationLong("eval-expiration-duration", 504*time.Hour, "Duration before evals expire (default 3 weeks)")
 		offlineActivityThreshold     = fs.DurationLong("offline-activity-threshold", 168*time.Hour, "Duration of inactivity before auto-unsubscribe (default 1 week)")
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
+		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
 		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
 	)
 
@@ -159,6 +160,7 @@ func mainE() error {
 			OfflineActivityThreshold:     *offlineActivityThreshold,
 			NumConsumers:                 *numConsumers,
 			GuildID:                      *guildID,
+			JobBufferSize:                int(*jobBufferSize),
 		},
 	)
 

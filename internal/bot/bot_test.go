@@ -290,6 +290,7 @@ func newTestBot(
 		OfflineActivityThreshold:     5 * time.Minute,
 		NumConsumers:                 2,
 		GuildID:                      "",
+		JobBufferSize:                20,
 	})
 }
 
