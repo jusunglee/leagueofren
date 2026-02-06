@@ -6,6 +6,106 @@ import (
 	"time"
 )
 
+// PublicTranslation represents a community-visible translation with vote counts
+type PublicTranslation struct {
+	ID           int64
+	Username     string
+	Translation  string
+	Explanation  sql.NullString
+	Language     string
+	Region       string
+	SourceBotID  sql.NullString
+	RiotVerified bool
+	Upvotes      int32
+	Downvotes    int32
+	CreatedAt    time.Time
+}
+
+// Vote represents an IP-hashed vote on a public translation
+type Vote struct {
+	ID            int64
+	TranslationID int64
+	IpHash        string
+	Vote          int16
+	CreatedAt     time.Time
+}
+
+// PublicFeedback represents user feedback on a public translation
+type PublicFeedback struct {
+	ID            int64
+	TranslationID int64
+	IpHash        string
+	FeedbackText  string
+	CreatedAt     time.Time
+}
+
+type UpsertPublicTranslationParams struct {
+	Username     string
+	Translation  string
+	Explanation  sql.NullString
+	Language     string
+	Region       string
+	SourceBotID  sql.NullString
+	RiotVerified bool
+}
+
+type ListPublicTranslationsNewParams struct {
+	Region   string
+	Language string
+	Limit    int32
+	Offset   int32
+}
+
+type ListPublicTranslationsTopParams struct {
+	Region    string
+	Language  string
+	Limit     int32
+	Offset    int32
+	CreatedAt time.Time
+}
+
+type CountPublicTranslationsParams struct {
+	Region   string
+	Language string
+}
+
+type UpsertVoteParams struct {
+	TranslationID int64
+	IpHash        string
+	Vote          int16
+}
+
+type GetVoteParams struct {
+	TranslationID int64
+	IpHash        string
+}
+
+type DeleteVoteParams struct {
+	TranslationID int64
+	IpHash        string
+}
+
+type CreatePublicFeedbackParams struct {
+	TranslationID int64
+	IpHash        string
+	FeedbackText  string
+}
+
+type ListPublicFeedbackParams struct {
+	Limit  int32
+	Offset int32
+}
+
+type ListPublicFeedbackRow struct {
+	ID            int64
+	TranslationID int64
+	IpHash        string
+	FeedbackText  string
+	CreatedAt     time.Time
+	Username      string
+	Translation   string
+}
+
 // Subscription represents a user's subscription to track a LoL player
 type Subscription struct {
 	ID               int64
@@ -201,6 +301,28 @@ type Repository interface {
 	DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error)
 	DeleteExpiredAccountCache(ctx context.Context) error
 	DeleteExpiredGameCache(ctx context.Context) error
+
+	// Public Translations (companion website)
+	UpsertPublicTranslation(ctx context.Context, arg UpsertPublicTranslationParams) (PublicTranslation, error)
+	GetPublicTranslation(ctx context.Context, id int64) (PublicTranslation, error)
+	GetPublicTranslationByUsername(ctx context.Context, username string) (PublicTranslation, error)
+	ListPublicTranslationsNew(ctx context.Context, arg ListPublicTranslationsNewParams) ([]PublicTranslation, error)
+	ListPublicTranslationsTop(ctx context.Context, arg ListPublicTranslationsTopParams) ([]PublicTranslation, error)
+	CountPublicTranslations(ctx context.Context, arg CountPublicTranslationsParams) (int64, error)
+	IncrementUpvotes(ctx context.Context, id int64) error
+	DecrementUpvotes(ctx context.Context, id int64) error
+	IncrementDownvotes(ctx context.Context, id int64) error
+	DecrementDownvotes(ctx context.Context, id int64) error
+
+	// Votes
+	UpsertVote(ctx context.Context, arg UpsertVoteParams) (Vote, error)
+	GetVote(ctx context.Context, arg GetVoteParams) (Vote, error)
+	DeleteVote(ctx context.Context, arg DeleteVoteParams) (int64, error)
+
+	// Public Feedback
+	CreatePublicFeedback(ctx context.Context, arg CreatePublicFeedbackParams) (PublicFeedback, error)
+	ListPublicFeedback(ctx context.Context, arg ListPublicFeedbackParams) ([]ListPublicFeedbackRow, error)
+	CountPublicFeedback(ctx context.Context) (int64, error)
 
 	// Transaction support
 	WithTx(ctx context.Context, fn func(repo Repository) error) error

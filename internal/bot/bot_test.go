@@ -231,6 +231,86 @@ func (m *MockRepository) DeleteExpiredGameCache(ctx context.Context) error {
 	return ret.Error(0)
 }
 
+func (m *MockRepository) UpsertPublicTranslation(ctx context.Context, arg db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(db.PublicTranslation), ret.Error(1)
+}
+
+func (m *MockRepository) GetPublicTranslation(ctx context.Context, id int64) (db.PublicTranslation, error) {
+	ret := m.Called(ctx, id)
+	return ret.Get(0).(db.PublicTranslation), ret.Error(1)
+}
+
+func (m *MockRepository) GetPublicTranslationByUsername(ctx context.Context, username string) (db.PublicTranslation, error) {
+	ret := m.Called(ctx, username)
+	return ret.Get(0).(db.PublicTranslation), ret.Error(1)
+}
+
+func (m *MockRepository) ListPublicTranslationsNew(ctx context.Context, arg db.ListPublicTranslationsNewParams) ([]db.PublicTranslation, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).([]db.PublicTranslation), ret.Error(1)
+}
+
+func (m *MockRepository) ListPublicTranslationsTop(ctx context.Context, arg db.ListPublicTranslationsTopParams) ([]db.PublicTranslation, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).([]db.PublicTranslation), ret.Error(1)
+}
+
+func (m *MockRepository) CountPublicTranslations(ctx context.Context, arg db.CountPublicTranslationsParams) (int64, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
+func (m *MockRepository) IncrementUpvotes(ctx context.Context, id int64) error {
+	ret := m.Called(ctx, id)
+	return ret.Error(0)
+}
+
+func (m *MockRepository) DecrementUpvotes(ctx context.Context, id int64) error {
+	ret := m.Called(ctx, id)
+	return ret.Error(0)
+}
+
+func (m *MockRepository) IncrementDownvotes(ctx context.Context, id int64) error {
+	ret := m.Called(ctx, id)
+	return ret.Error(0)
+}
+
+func (m *MockRepository) DecrementDownvotes(ctx context.Context, id int64) error {
+	ret := m.Called(ctx, id)
+	return ret.Error(0)
+}
+
+func (m *MockRepository) UpsertVote(ctx context.Context, arg db.UpsertVoteParams) (db.Vote, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(db.Vote), ret.Error(1)
+}
+
+func (m *MockRepository) GetVote(ctx context.Context, arg db.GetVoteParams) (db.Vote, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(db.Vote), ret.Error(1)
+}
+
+func (m *MockRepository) DeleteVote(ctx context.Context, arg db.DeleteVoteParams) (int64, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
+func (m *MockRepository) CreatePublicFeedback(ctx context.Context, arg db.CreatePublicFeedbackParams) (db.PublicFeedback, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(db.PublicFeedback), ret.Error(1)
+}
+
+func (m *MockRepository) ListPublicFeedback(ctx context.Context, arg db.ListPublicFeedbackParams) ([]db.ListPublicFeedbackRow, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).([]db.ListPublicFeedbackRow), ret.Error(1)
+}
+
+func (m *MockRepository) CountPublicFeedback(ctx context.Context) (int64, error) {
+	ret := m.Called(ctx)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
 func (m *MockRepository) WithTx(ctx context.Context, fn func(repo db.Repository) error) error {
 	ret := m.Called(ctx, fn)
 	if ret.Error(0) == nil {

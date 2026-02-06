@@ -491,6 +491,72 @@ func (r *Repository) DeleteExpiredGameCache(ctx context.Context) error {
 	return err
 }
 
+// Public Translation stubs (companion website is Postgres-only)
+
+func (r *Repository) UpsertPublicTranslation(_ context.Context, _ db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {
+	return db.PublicTranslation{}, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) GetPublicTranslation(_ context.Context, _ int64) (db.PublicTranslation, error) {
+	return db.PublicTranslation{}, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) GetPublicTranslationByUsername(_ context.Context, _ string) (db.PublicTranslation, error) {
+	return db.PublicTranslation{}, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) ListPublicTranslationsNew(_ context.Context, _ db.ListPublicTranslationsNewParams) ([]db.PublicTranslation, error) {
+	return nil, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) ListPublicTranslationsTop(_ context.Context, _ db.ListPublicTranslationsTopParams) ([]db.PublicTranslation, error) {
+	return nil, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) CountPublicTranslations(_ context.Context, _ db.CountPublicTranslationsParams) (int64, error) {
+	return 0, fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) IncrementUpvotes(_ context.Context, _ int64) error {
+	return fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) DecrementUpvotes(_ context.Context, _ int64) error {
+	return fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) IncrementDownvotes(_ context.Context, _ int64) error {
+	return fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) DecrementDownvotes(_ context.Context, _ int64) error {
+	return fmt.Errorf("public translations not supported in SQLite mode")
+}
+
+func (r *Repository) UpsertVote(_ context.Context, _ db.UpsertVoteParams) (db.Vote, error) {
+	return db.Vote{}, fmt.Errorf("votes not supported in SQLite mode")
+}
+
+func (r *Repository) GetVote(_ context.Context, _ db.GetVoteParams) (db.Vote, error) {
+	return db.Vote{}, fmt.Errorf("votes not supported in SQLite mode")
+}
+
+func (r *Repository) DeleteVote(_ context.Context, _ db.DeleteVoteParams) (int64, error) {
+	return 0, fmt.Errorf("votes not supported in SQLite mode")
+}
+
+func (r *Repository) CreatePublicFeedback(_ context.Context, _ db.CreatePublicFeedbackParams) (db.PublicFeedback, error) {
+	return db.PublicFeedback{}, fmt.Errorf("public feedback not supported in SQLite mode")
+}
+
+func (r *Repository) ListPublicFeedback(_ context.Context, _ db.ListPublicFeedbackParams) ([]db.ListPublicFeedbackRow, error) {
+	return nil, fmt.Errorf("public feedback not supported in SQLite mode")
+}
+
+func (r *Repository) CountPublicFeedback(_ context.Context) (int64, error) {
+	return 0, fmt.Errorf("public feedback not supported in SQLite mode")
+}
+
 // Helper functions
 
 func scanSubscription(row *sql.Row) (db.Subscription, error) {
