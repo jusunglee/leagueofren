@@ -12,9 +12,8 @@ echo ""
 
 # Check for docker
 if ! command -v docker &> /dev/null; then
-    echo "Installing Docker..."
-    apt-get update -qq
-    apt-get install -y -qq docker.io docker-compose-plugin
+    echo "Installing Docker via official script..."
+    curl -fsSL https://get.docker.com | sh
     systemctl enable --now docker
     echo "✓ Docker installed"
 else
