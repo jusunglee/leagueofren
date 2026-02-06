@@ -16,6 +16,7 @@ type PublicTranslation struct {
 	Region       string
 	SourceBotID  sql.NullString
 	RiotVerified bool
+	Rank         sql.NullString
 	Upvotes      int32
 	Downvotes    int32
 	CreatedAt    time.Time
@@ -47,6 +48,7 @@ type UpsertPublicTranslationParams struct {
 	Region       string
 	SourceBotID  sql.NullString
 	RiotVerified bool
+	Rank         sql.NullString
 }
 
 type ListPublicTranslationsNewParams struct {

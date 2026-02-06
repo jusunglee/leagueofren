@@ -91,28 +91,32 @@ func main() {
 		pool.Exec(ctx, "TRUNCATE public_translations, votes, public_feedback CASCADE")
 	}
 
+	ranks := []string{"IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"}
+
 	log.Printf("Seeding %d translations...", len(samples))
 	for _, s := range samples {
 		upvotes := rand.IntN(200)
 		downvotes := rand.IntN(30)
 		hoursAgo := rand.IntN(720) // up to 30 days
 		createdAt := time.Now().Add(-time.Duration(hoursAgo) * time.Hour)
+		rank := ranks[rand.IntN(len(ranks))]
 
 		_, err := pool.Exec(ctx, `
-			INSERT INTO public_translations (username, translation, explanation, language, region, riot_verified, upvotes, downvotes, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			INSERT INTO public_translations (username, translation, explanation, language, region, riot_verified, rank, upvotes, downvotes, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			ON CONFLICT (username) DO UPDATE SET
 				translation = EXCLUDED.translation,
 				explanation = EXCLUDED.explanation,
 				upvotes = EXCLUDED.upvotes,
 				downvotes = EXCLUDED.downvotes,
+				rank = EXCLUDED.rank,
 				created_at = EXCLUDED.created_at
-		`, s.Username, s.Translation, s.Explanation, s.Language, s.Region, rand.IntN(2) == 1, upvotes, downvotes, createdAt)
+		`, s.Username, s.Translation, s.Explanation, s.Language, s.Region, rand.IntN(2) == 1, rank, upvotes, downvotes, createdAt)
 		if err != nil {
 			log.Printf("  WARN: %s: %v", s.Username, err)
 			continue
 		}
-		fmt.Printf("  ✓ %s → %s (%+d, %s ago)\n", s.Username, s.Translation, upvotes-downvotes, time.Duration(hoursAgo)*time.Hour)
+		fmt.Printf("  ✓ %s → %s (%+d, %s, %s ago)\n", s.Username, s.Translation, upvotes-downvotes, rank, time.Duration(hoursAgo)*time.Hour)
 	}
 
 	var count int64
