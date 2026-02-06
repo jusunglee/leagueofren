@@ -1,4 +1,7 @@
-package setup
+// envsetup provides a lightweight .env configuration wizard.
+// It runs automatically on first bot startup when no .env file exists,
+// collecting Discord, Riot, and LLM credentials.
+package envsetup
 
 import (
 	"fmt"
@@ -186,15 +189,26 @@ func (m model) writeEnvFile() error {
 		llmKeyName = "GOOGLE_API_KEY"
 	}
 
-	content := fmt.Sprintf(`DATABASE_URL=./leagueofren.db
-DISCORD_TOKEN=%s
-RIOT_API_KEY=%s
-LLM_PROVIDER=%s
-LLM_MODEL=%s
-%s=%s
-`, m.discordToken, m.riotAPIKey, m.llmProvider, llmModel, llmKeyName, m.llmAPIKey)
+	lines := []string{
+		"DATABASE_URL=./leagueofren.db",
+		"DISCORD_TOKEN=" + sanitizeValue(m.discordToken),
+		"RIOT_API_KEY=" + sanitizeValue(m.riotAPIKey),
+		"LLM_PROVIDER=" + sanitizeValue(m.llmProvider),
+		"LLM_MODEL=" + llmModel,
+		llmKeyName + "=" + sanitizeValue(m.llmAPIKey),
+		"",
+	}
+	content := strings.Join(lines, "\r\n")
 
 	return os.WriteFile(".env", []byte(content), 0600)
+}
+
+func sanitizeValue(s string) string {
+	s = strings.ReplaceAll(s, "\x00", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.TrimSpace(s)
+	return s
 }
 
 func (m model) View() string {
@@ -202,7 +216,7 @@ func (m model) View() string {
 
 	switch m.step {
 	case stepWelcome:
-		s.WriteString(titleStyle.Render("Welcome to League of Ren Setup"))
+		s.WriteString(titleStyle.Render("League of Ren - Env Setup"))
 		s.WriteString("\n\n")
 		s.WriteString("This wizard will help you configure the bot.\n")
 		s.WriteString("You'll need:\n\n")
