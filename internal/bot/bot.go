@@ -749,10 +749,9 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		"game_id", job.gameID,
 	)
 
-	// Best-effort: submit translations to the companion website if configured
+	// Best-effort: submit usernames to the companion website for server-side translation
 	if b.websiteClient.Enabled() {
-		language := detectLanguage(job.translations)
-		if err := b.websiteClient.SubmitTranslations(ctx, job.translations, language, job.region); err != nil {
+		if err := b.websiteClient.SubmitTranslations(ctx, job.translations, job.region); err != nil {
 			b.log.WarnContext(ctx, "failed to submit translations to website", "error", err)
 		}
 	}
@@ -794,17 +793,6 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	}
 
 	return jobs, err
-}
-
-func detectLanguage(translations []translation.Translation) string {
-	for _, t := range translations {
-		for _, r := range t.Original {
-			if unicode.Is(unicode.Hangul, r) {
-				return "korean"
-			}
-		}
-	}
-	return "chinese"
 }
 
 // TODO: Only supports korean and chinese so far, make the language a user-passed flag.

@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/riot"
+	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/jusunglee/leagueofren/internal/web/handlers"
 	"github.com/jusunglee/leagueofren/internal/web/middleware"
 )
@@ -14,23 +16,27 @@ type Config struct {
 }
 
 type Router struct {
-	repo   db.Repository
-	log    *slog.Logger
-	config Config
+	repo       db.Repository
+	log        *slog.Logger
+	config     Config
+	riot       *riot.DirectClient
+	translator *translation.Translator
 }
 
-func NewRouter(repo db.Repository, log *slog.Logger, config Config) *Router {
+func NewRouter(repo db.Repository, log *slog.Logger, config Config, riotClient *riot.DirectClient, translator *translation.Translator) *Router {
 	return &Router{
-		repo:   repo,
-		log:    log,
-		config: config,
+		repo:       repo,
+		log:        log,
+		config:     config,
+		riot:       riotClient,
+		translator: translator,
 	}
 }
 
 func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	translationHandler := handlers.NewTranslationHandler(r.repo, r.log)
+	translationHandler := handlers.NewTranslationHandler(r.repo, r.log, r.riot, r.translator)
 	voteHandler := handlers.NewVoteHandler(r.repo, r.log)
 	feedbackHandler := handlers.NewFeedbackHandler(r.repo, r.log)
 
