@@ -24,6 +24,8 @@ type Config struct {
 	EvaluateSubscriptionsTimeout time.Duration
 	EvalExpirationDuration       time.Duration
 	OfflineActivityThreshold     time.Duration
+	TranslationRetentionDuration time.Duration
+	FeedbackRetentionDuration    time.Duration
 	NumConsumers                 int64
 	GuildID                      string
 }
@@ -750,6 +752,26 @@ func (b *Bot) cleanupOldData(ctx context.Context) error {
 		return fmt.Errorf("deleting old evals: %w", err)
 	}
 	log.InfoContext(ctx, "Deleted rows", slog.Int64("rows", rows))
+
+	translationRows, err := b.repo.DeleteOldTranslations(ctx, time.Now().Add(-b.config.TranslationRetentionDuration))
+	if err != nil {
+		return fmt.Errorf("deleting old translations: %w", err)
+	}
+	log.InfoContext(ctx, "deleted old translations", slog.Int64("rows", translationRows))
+
+	feedbackRows, err := b.repo.DeleteOldFeedback(ctx, time.Now().Add(-b.config.FeedbackRetentionDuration))
+	if err != nil {
+		return fmt.Errorf("deleting old feedback: %w", err)
+	}
+	log.InfoContext(ctx, "deleted old feedback", slog.Int64("rows", feedbackRows))
+
+	if err := b.repo.DeleteExpiredAccountCache(ctx); err != nil {
+		return fmt.Errorf("deleting expired account cache: %w", err)
+	}
+	if err := b.repo.DeleteExpiredGameCache(ctx); err != nil {
+		return fmt.Errorf("deleting expired game cache: %w", err)
+	}
+	log.InfoContext(ctx, "cleaned up expired caches")
 
 	subs, err := b.repo.FindSubscriptionsWithExpiredNewestOnlineEval(ctx, time.Now().Add(-b.config.OfflineActivityThreshold))
 	if len(subs) == 0 {

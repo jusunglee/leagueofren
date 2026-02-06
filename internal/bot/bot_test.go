@@ -206,6 +206,16 @@ func (m *MockRepository) CacheGameStatus(ctx context.Context, arg db.CacheGameSt
 	return ret.Error(0)
 }
 
+func (m *MockRepository) DeleteOldTranslations(ctx context.Context, before time.Time) (int64, error) {
+	ret := m.Called(ctx, before)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
+func (m *MockRepository) DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error) {
+	ret := m.Called(ctx, before)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
 func (m *MockRepository) DeleteExpiredAccountCache(ctx context.Context) error {
 	ret := m.Called(ctx)
 	return ret.Error(0)
@@ -278,6 +288,8 @@ func newTestBot(
 		EvaluateSubscriptionsTimeout: time.Minute,
 		EvalExpirationDuration:       10 * time.Minute,
 		OfflineActivityThreshold:     5 * time.Minute,
+		TranslationRetentionDuration: 720 * time.Hour,
+		FeedbackRetentionDuration:    2160 * time.Hour,
 		NumConsumers:                 2,
 		GuildID:                      "",
 	})
@@ -302,6 +314,10 @@ func TestCleanupOldData(t *testing.T) {
 		mockSubLogger.On("InfoContext", mock.Anything, mock.Anything, mock.Anything).Return()
 
 		mockRepo.On("DeleteEvals", mock.Anything, mock.Anything).Return(int64(5), nil)
+		mockRepo.On("DeleteOldTranslations", mock.Anything, mock.Anything).Return(int64(0), nil)
+		mockRepo.On("DeleteOldFeedback", mock.Anything, mock.Anything).Return(int64(0), nil)
+		mockRepo.On("DeleteExpiredAccountCache", mock.Anything).Return(nil)
+		mockRepo.On("DeleteExpiredGameCache", mock.Anything).Return(nil)
 		mockRepo.On("FindSubscriptionsWithExpiredNewestOnlineEval", mock.Anything, mock.Anything).
 			Return([]db.FindSubscriptionsWithExpiredNewestOnlineEvalRow{}, nil)
 
