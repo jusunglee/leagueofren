@@ -268,6 +268,7 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if tagLine != "" {
 		_, err = h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
 		if err != nil {
+			h.log.WarnContext(r.Context(), "riot lookup failed", "gameName", gameName, "tagLine", tagLine, "region", req.Region, "error", err)
 			writeError(w, http.StatusBadRequest, "username not found on Riot servers")
 			return
 		}
