@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X } from 'lucide-react'
-import { listTranslations, vote } from '../lib/api'
+import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X, MessageSquarePlus, Send } from 'lucide-react'
+import { listTranslations, vote, submitFeedback } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
 
 // ── Filled SVG icons for sort tabs ──
@@ -228,11 +228,15 @@ function buildPorofessorUrl(username: string, region: string) {
   return `https://www.porofessor.gg/live/${region.toLowerCase()}/${encodeURIComponent(username)}`
 }
 
-function TranslationCard({ t, index, onVote }: {
+function TranslationCard({ t, index, onVote, onFeedback }: {
   t: Translation
   index: number
   onVote: (id: number, dir: 1 | -1) => void
+  onFeedback: (id: number, text: string) => void
 }) {
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(false)
   const score = t.upvotes - t.downvotes
   const isTop3 = index < 3
   const rank = t.rank?.toUpperCase()
@@ -305,7 +309,51 @@ function TranslationCard({ t, index, onVote }: {
             className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--accent)] hover:text-[var(--background)] hover:border-[var(--border)] transition-all duration-150">
             <MessageCircleQuestion size={10} strokeWidth={2.5} /> Learn More
           </a>
+          <button
+            onClick={() => { setShowFeedback(!showFeedback); setFeedbackSent(false) }}
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--violet)] hover:text-white hover:border-[var(--border)] transition-all duration-150"
+          >
+            <MessageSquarePlus size={10} strokeWidth={2.5} /> Feedback
+          </button>
         </div>
+        {showFeedback && (
+          <div className="mt-3 flex items-center gap-2">
+            {feedbackSent ? (
+              <span className="pixel-font text-[10px] text-[var(--secondary)] tracking-wide">Thanks for your feedback!</span>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && feedbackText.trim()) {
+                      onFeedback(t.id, feedbackText.trim())
+                      setFeedbackText('')
+                      setFeedbackSent(true)
+                    }
+                  }}
+                  placeholder="Suggest a correction..."
+                  maxLength={500}
+                  className="flex-1 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] px-3 py-1.5 text-xs focus:border-[var(--violet)] focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    if (feedbackText.trim()) {
+                      onFeedback(t.id, feedbackText.trim())
+                      setFeedbackText('')
+                      setFeedbackSent(true)
+                    }
+                  }}
+                  disabled={!feedbackText.trim()}
+                  className="pixel-font text-[10px] px-3 py-1.5 bg-[var(--violet)] text-white border-2 border-[var(--border)] rounded-[4px] pixel-shadow-sm tracking-wide uppercase hover:bg-[var(--violet-deep)] transition-all duration-150 btn-press disabled:opacity-40 inline-flex items-center gap-1"
+                >
+                  <Send size={10} strokeWidth={2.5} /> Send
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -343,6 +391,10 @@ export function Leaderboard() {
   const voteMutation = useMutation({
     mutationFn: ({ id, direction }: { id: number; direction: 1 | -1 }) => vote(id, direction),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['translations'] }),
+  })
+
+  const feedbackMutation = useMutation({
+    mutationFn: ({ id, text }: { id: number; text: string }) => submitFeedback(id, text),
   })
 
   const filteredData = data?.data.filter(t => {
@@ -429,6 +481,7 @@ export function Leaderboard() {
               t={t}
               index={(page - 1) * 25 + i}
               onVote={(id, dir) => voteMutation.mutate({ id, direction: dir })}
+              onFeedback={(id, text) => feedbackMutation.mutate({ id, text })}
             />
           ))}
 
