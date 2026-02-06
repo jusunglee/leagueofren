@@ -196,7 +196,9 @@ type Repository interface {
 	GetCachedGameStatus(ctx context.Context, arg GetCachedGameStatusParams) (GetCachedGameStatusRow, error)
 	CacheGameStatus(ctx context.Context, arg CacheGameStatusParams) error
 
-	// Cleanup
+	// Retention/Cleanup
+	DeleteOldTranslations(ctx context.Context, before time.Time) (int64, error)
+	DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error)
 	DeleteExpiredAccountCache(ctx context.Context) error
 	DeleteExpiredGameCache(ctx context.Context) error
 

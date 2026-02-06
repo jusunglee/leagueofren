@@ -344,6 +344,14 @@ func (r *Repository) CacheGameStatus(ctx context.Context, arg db.CacheGameStatus
 	})
 }
 
+func (r *Repository) DeleteOldTranslations(ctx context.Context, before time.Time) (int64, error) {
+	return r.queries.DeleteOldTranslations(ctx, pgtype.Timestamptz{Valid: true, Time: before})
+}
+
+func (r *Repository) DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error) {
+	return r.queries.DeleteOldFeedback(ctx, pgtype.Timestamptz{Valid: true, Time: before})
+}
+
 func (r *Repository) DeleteExpiredAccountCache(ctx context.Context) error {
 	return r.queries.DeleteExpiredAccountCache(ctx)
 }

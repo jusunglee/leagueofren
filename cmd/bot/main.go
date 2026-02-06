@@ -73,6 +73,8 @@ func mainE() error {
 		evaluateSubscriptionsTimeout = fs.DurationLong("evaluate-subscriptions-timeout", 1*time.Minute, "Timeout for evaluating subscriptions")
 		evalExpirationDuration       = fs.DurationLong("eval-expiration-duration", 504*time.Hour, "Duration before evals expire (default 3 weeks)")
 		offlineActivityThreshold     = fs.DurationLong("offline-activity-threshold", 168*time.Hour, "Duration of inactivity before auto-unsubscribe (default 1 week)")
+		translationRetentionDuration = fs.DurationLong("translation-retention-duration", 720*time.Hour, "Duration before translations expire (default 30 days)")
+		feedbackRetentionDuration    = fs.DurationLong("feedback-retention-duration", 2160*time.Hour, "Duration before feedback expires (default 90 days)")
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
 		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
 		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
@@ -158,6 +160,8 @@ func mainE() error {
 			EvaluateSubscriptionsTimeout: *evaluateSubscriptionsTimeout,
 			EvalExpirationDuration:       *evalExpirationDuration,
 			OfflineActivityThreshold:     *offlineActivityThreshold,
+			TranslationRetentionDuration: *translationRetentionDuration,
+			FeedbackRetentionDuration:    *feedbackRetentionDuration,
 			NumConsumers:                 *numConsumers,
 			GuildID:                      *guildID,
 			JobBufferSize:                int(*jobBufferSize),

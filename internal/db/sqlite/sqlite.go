@@ -465,6 +465,22 @@ func (r *Repository) CacheGameStatus(ctx context.Context, arg db.CacheGameStatus
 	return err
 }
 
+func (r *Repository) DeleteOldTranslations(ctx context.Context, before time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(ctx, `DELETE FROM translations WHERE created_at < ?`, before.Format(time.RFC3339))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (r *Repository) DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(ctx, `DELETE FROM feedback WHERE created_at < ?`, before.Format(time.RFC3339))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 func (r *Repository) DeleteExpiredAccountCache(ctx context.Context) error {
 	_, err := r.executor.ExecContext(ctx, `DELETE FROM riot_account_cache WHERE expires_at < datetime('now')`)
 	return err
