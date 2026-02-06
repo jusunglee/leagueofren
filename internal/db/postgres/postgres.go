@@ -447,7 +447,7 @@ func (r *Repository) GetPublicTranslation(ctx context.Context, id int64) (db.Pub
 	return convertPublicTranslationRow(result.ID, result.Username, result.Translation,
 		result.Explanation, result.Language, result.Region, result.SourceBotID,
 		result.RiotVerified, result.Rank, result.TopChampions,
-		result.Upvotes, result.Downvotes, result.CreatedAt), nil
+		result.Upvotes, result.Downvotes, result.CreatedAt, result.FirstSeen), nil
 }
 
 func (r *Repository) GetPublicTranslationByUsername(ctx context.Context, username string) (db.PublicTranslation, error) {
@@ -461,7 +461,7 @@ func (r *Repository) GetPublicTranslationByUsername(ctx context.Context, usernam
 	return convertPublicTranslationRow(result.ID, result.Username, result.Translation,
 		result.Explanation, result.Language, result.Region, result.SourceBotID,
 		result.RiotVerified, result.Rank, result.TopChampions,
-		result.Upvotes, result.Downvotes, result.CreatedAt), nil
+		result.Upvotes, result.Downvotes, result.CreatedAt, result.FirstSeen), nil
 }
 
 func (r *Repository) ListPublicTranslationsNew(ctx context.Context, arg db.ListPublicTranslationsNewParams) ([]db.PublicTranslation, error) {
@@ -479,7 +479,7 @@ func (r *Repository) ListPublicTranslationsNew(ctx context.Context, arg db.ListP
 		out[i] = convertPublicTranslationRow(r.ID, r.Username, r.Translation,
 			r.Explanation, r.Language, r.Region, r.SourceBotID,
 			r.RiotVerified, r.Rank, r.TopChampions,
-			r.Upvotes, r.Downvotes, r.CreatedAt)
+			r.Upvotes, r.Downvotes, r.CreatedAt, r.FirstSeen)
 	}
 	return out, nil
 }
@@ -500,7 +500,7 @@ func (r *Repository) ListPublicTranslationsTop(ctx context.Context, arg db.ListP
 		out[i] = convertPublicTranslationRow(r.ID, r.Username, r.Translation,
 			r.Explanation, r.Language, r.Region, r.SourceBotID,
 			r.RiotVerified, r.Rank, r.TopChampions,
-			r.Upvotes, r.Downvotes, r.CreatedAt)
+			r.Upvotes, r.Downvotes, r.CreatedAt, r.FirstSeen)
 	}
 	return out, nil
 }
@@ -685,6 +685,7 @@ func convertPublicTranslationRow(
 	sourceBotID pgtype.Text, riotVerified bool,
 	rank, topChampions pgtype.Text,
 	upvotes, downvotes int32, createdAt pgtype.Timestamptz,
+	firstSeen pgtype.Timestamptz,
 ) db.PublicTranslation {
 	return db.PublicTranslation{
 		ID:           id,
@@ -700,6 +701,7 @@ func convertPublicTranslationRow(
 		Upvotes:      upvotes,
 		Downvotes:    downvotes,
 		CreatedAt:    createdAt.Time,
+		FirstSeen:    firstSeen.Time,
 	}
 }
 

@@ -13,6 +13,7 @@ export const translationSchema = z.object({
   upvotes: z.number(),
   downvotes: z.number(),
   created_at: z.string(),
+  first_seen: z.string().optional(),
 })
 
 export type Translation = z.infer<typeof translationSchema>

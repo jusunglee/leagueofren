@@ -35,6 +35,7 @@ type translationResponse struct {
 	Downvotes    int32    `json:"downvotes"`
 	Score        float64  `json:"score,omitempty"`
 	CreatedAt    string   `json:"created_at"`
+	FirstSeen    string   `json:"first_seen,omitempty"`
 }
 
 type paginationMeta struct {
@@ -59,6 +60,7 @@ func toTranslationResponse(t db.PublicTranslation) translationResponse {
 		Upvotes:      t.Upvotes,
 		Downvotes:    t.Downvotes,
 		CreatedAt:    t.CreatedAt.Format(time.RFC3339),
+		FirstSeen:    t.FirstSeen.Format(time.RFC3339),
 	}
 	if t.Explanation.Valid {
 		resp.Explanation = &t.Explanation.String

@@ -602,7 +602,7 @@ func (q *Queries) GetPlayer(ctx context.Context, username string) (Player, error
 const getPublicTranslation = `-- name: GetPublicTranslation :one
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE pt.id = $1
@@ -622,6 +622,7 @@ type GetPublicTranslationRow struct {
 	Upvotes      int32              `json:"upvotes"`
 	Downvotes    int32              `json:"downvotes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	FirstSeen    pgtype.Timestamptz `json:"first_seen"`
 }
 
 func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (GetPublicTranslationRow, error) {
@@ -641,6 +642,7 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (GetPublic
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
+		&i.FirstSeen,
 	)
 	return i, err
 }
@@ -648,7 +650,7 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (GetPublic
 const getPublicTranslationByUsername = `-- name: GetPublicTranslationByUsername :one
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE pt.username = $1
@@ -668,6 +670,7 @@ type GetPublicTranslationByUsernameRow struct {
 	Upvotes      int32              `json:"upvotes"`
 	Downvotes    int32              `json:"downvotes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	FirstSeen    pgtype.Timestamptz `json:"first_seen"`
 }
 
 func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username string) (GetPublicTranslationByUsernameRow, error) {
@@ -687,6 +690,7 @@ func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username s
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
+		&i.FirstSeen,
 	)
 	return i, err
 }
@@ -957,7 +961,7 @@ func (q *Queries) ListPublicFeedback(ctx context.Context, arg ListPublicFeedback
 const listPublicTranslationsNew = `-- name: ListPublicTranslationsNew :many
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE ($1::text = '' OR p.region = $1)
@@ -987,6 +991,7 @@ type ListPublicTranslationsNewRow struct {
 	Upvotes      int32              `json:"upvotes"`
 	Downvotes    int32              `json:"downvotes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	FirstSeen    pgtype.Timestamptz `json:"first_seen"`
 }
 
 func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicTranslationsNewParams) ([]ListPublicTranslationsNewRow, error) {
@@ -1017,6 +1022,7 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
+			&i.FirstSeen,
 		); err != nil {
 			return nil, err
 		}
@@ -1031,7 +1037,7 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 const listPublicTranslationsTop = `-- name: ListPublicTranslationsTop :many
 SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
        p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
-       pt.upvotes, pt.downvotes, pt.created_at
+       pt.upvotes, pt.downvotes, pt.created_at, p.first_seen
 FROM public_translations pt
 JOIN players p ON pt.player_username = p.username
 WHERE ($1::text = '' OR p.region = $1)
@@ -1063,6 +1069,7 @@ type ListPublicTranslationsTopRow struct {
 	Upvotes      int32              `json:"upvotes"`
 	Downvotes    int32              `json:"downvotes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	FirstSeen    pgtype.Timestamptz `json:"first_seen"`
 }
 
 func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicTranslationsTopParams) ([]ListPublicTranslationsTopRow, error) {
@@ -1094,6 +1101,7 @@ func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicT
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
+			&i.FirstSeen,
 		); err != nil {
 			return nil, err
 		}
