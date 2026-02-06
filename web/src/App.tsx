@@ -75,25 +75,22 @@ export default function App() {
 
               <div className="border-t-2 border-dashed border-[var(--border-light)]" />
 
-              {/* Contribute */}
+              {/* On Submissions */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 bg-[var(--secondary)] border-4 border-[var(--border)] rounded-[4px] flex items-center justify-center pixel-shadow-sm">
                     <Heart size={12} strokeWidth={2.5} className="text-white" />
                   </div>
-                  <h3 className="pixel-font text-[10px] tracking-wide">Contribute</h3>
+                  <h3 className="pixel-font text-[10px] tracking-wide">On Submissions</h3>
                 </div>
                 <p className="text-xs text-[var(--foreground-muted)] leading-relaxed mb-3">
-                  Run the bot and opt in to share translations with the community.
+                  Translations here are "captured" from real games — not mass-submitted.
+                  The bot is{' '}
+                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="text-[var(--violet)] underline hover:text-[var(--primary)] transition-colors">
+                    open source
+                  </a>
+                  {' '}and you can run it yourself, optionally having it submit translations to this site. Thanks for contributing!
                 </p>
-                <a
-                  href={REPO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="pixel-font text-[10px] px-3 py-1.5 bg-[var(--secondary)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[var(--secondary-hover)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-2"
-                >
-                  Get the Bot ★
-                </a>
               </div>
 
               <div className="border-t-2 border-dashed border-[var(--border-light)]" />
@@ -164,19 +161,16 @@ export default function App() {
                     <div className="w-7 h-7 bg-[var(--secondary)] border-4 border-[var(--border)] rounded-[4px] flex items-center justify-center pixel-shadow-sm">
                       <Heart size={14} strokeWidth={2.5} className="text-white" />
                     </div>
-                    <h3 className="pixel-font text-xs tracking-wide">Contribute</h3>
+                    <h3 className="pixel-font text-xs tracking-wide">On Submissions</h3>
                   </div>
-                  <p className="text-sm text-[var(--foreground-muted)] leading-relaxed mb-3">
-                    Run the bot and opt in to share translations.
+                  <p className="text-sm text-[var(--foreground-muted)] leading-relaxed">
+                    Translations here are "captured" from real games — not mass-submitted.
+                    The bot is{' '}
+                    <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="text-[var(--violet)] underline hover:text-[var(--primary)] transition-colors">
+                      open source
+                    </a>
+                    {' '}and you can run it yourself. Thanks for contributing!
                   </p>
-                  <a
-                    href={REPO_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="pixel-font text-[10px] px-3 py-1.5 bg-[var(--secondary)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase btn-press inline-flex items-center gap-2"
-                  >
-                    Get the Bot ★
-                  </a>
                 </div>
               </div>
             </section>
