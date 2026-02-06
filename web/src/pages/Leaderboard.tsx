@@ -280,7 +280,7 @@ function TranslationCard({ t, index, onVote }: {
           </span>
           {rank && RANK_ICON[rank] && (
             <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
-              <img src={RANK_ICON[rank]} alt="" className="w-6 h-6 object-contain" aria-hidden="true" />
+              <img src={RANK_ICON[rank]} alt="" className="w-4 h-4 object-contain" aria-hidden="true" />
               {rank}
             </span>
           )}
