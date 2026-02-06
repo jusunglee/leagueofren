@@ -171,19 +171,17 @@ const REGION_EMOJI: Record<string, string> = {
 
 const LANGUAGE_EMOJI: Record<string, string> = { korean: '🇰🇷', chinese: '🇨🇳' }
 
-const RANK_EMBLEM_URL = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem'
-
 const RANK_ICON: Record<string, string> = {
-  IRON: `${RANK_EMBLEM_URL}/emblem-iron.png`,
-  BRONZE: `${RANK_EMBLEM_URL}/emblem-bronze.png`,
-  SILVER: `${RANK_EMBLEM_URL}/emblem-silver.png`,
-  GOLD: `${RANK_EMBLEM_URL}/emblem-gold.png`,
-  PLATINUM: `${RANK_EMBLEM_URL}/emblem-platinum.png`,
-  EMERALD: `${RANK_EMBLEM_URL}/emblem-emerald.png`,
-  DIAMOND: `${RANK_EMBLEM_URL}/emblem-diamond.png`,
-  MASTER: `${RANK_EMBLEM_URL}/emblem-master.png`,
-  GRANDMASTER: `${RANK_EMBLEM_URL}/emblem-grandmaster.png`,
-  CHALLENGER: `${RANK_EMBLEM_URL}/emblem-challenger.png`,
+  IRON: '/iron.png',
+  BRONZE: '/bronze.png',
+  SILVER: '/silver.png',
+  GOLD: '/gold.png',
+  PLATINUM: '/platinum.png',
+  EMERALD: '/emerald.png',
+  DIAMOND: '/diamond.png',
+  MASTER: '/master.png',
+  GRANDMASTER: '/grandmaster.png',
+  CHALLENGER: '/challenger.png',
 }
 
 const REGION_OPTIONS: DropdownOption[] = ['NA', 'EUW', 'EUNE', 'KR', 'JP', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'TW']
