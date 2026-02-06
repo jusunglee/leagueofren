@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Github, Heart, BookOpen, Swords } from 'lucide-react'
 import { Leaderboard } from './pages/Leaderboard'
+import { Admin } from './pages/Admin'
 
 const queryClient = new QueryClient()
 
@@ -133,6 +134,7 @@ export default function App() {
             <main className="flex-1 p-4 lg:p-8">
               <Routes>
                 <Route path="/" element={<Leaderboard />} />
+              <Route path="/admin" element={<Admin />} />
               </Routes>
             </main>
           </div>
