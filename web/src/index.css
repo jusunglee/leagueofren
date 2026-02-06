@@ -1,23 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #FFF8F0;
-  --background-alt: #FEF3E2;
-  --foreground: #3B2D26;
-  --foreground-muted: #8B7355;
+  /* Celeste mountain night palette */
+  --background: #1a1a2e;
+  --background-alt: #16213e;
+  --foreground: #e8e0f0;
+  --foreground-muted: #8b85a0;
   --primary: #E85D75;
   --primary-hover: #D14A63;
-  --secondary: #5B8A72;
-  --secondary-hover: #4A7660;
+  --secondary: #6bc5a0;
+  --secondary-hover: #55b08a;
   --accent: #F2A65A;
   --accent-bright: #FFD93D;
   --sky: #7EC8E3;
   --lavender: #B8A9D4;
-  --border: #3B2D26;
-  --border-light: #D4C4A8;
-  --card: #FFFDF8;
-  --muted: #F5EDE0;
-  --ring: #E85D75;
+  --violet: #9b6dff;
+  --violet-deep: #7c4dff;
+  --border: #4a4070;
+  --border-light: #3d3560;
+  --card: #222244;
+  --muted: #2a2a4a;
+  --ring: #9b6dff;
   --destructive: #D4483B;
 }
 
@@ -25,7 +28,7 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: "Nunito", "Quicksand", system-ui, sans-serif;
-  background-image: radial-gradient(circle, #3B2D2610 1px, transparent 1px);
+  background-image: radial-gradient(circle, #9b6dff08 1px, transparent 1px);
   background-size: 16px 16px;
 }
 
@@ -44,13 +47,14 @@ body {
   font-family: "IBM Plex Mono", "Courier New", monospace;
 }
 
-/* ── Hard Pixel Shadows (zero blur, always) ── */
+/* ── Hard Pixel Shadows ── */
 .pixel-shadow-sm { box-shadow: 2px 2px 0px 0px var(--border); }
 .pixel-shadow-md { box-shadow: 4px 4px 0px 0px var(--border); }
 .pixel-shadow-lg { box-shadow: 6px 6px 0px 0px var(--border); }
 .pixel-shadow-xl { box-shadow: 8px 8px 0px 0px var(--border); }
 .pixel-shadow-accent { box-shadow: 4px 4px 0px 0px var(--accent); }
 .pixel-shadow-primary { box-shadow: 4px 4px 0px 0px var(--primary); }
+.pixel-shadow-violet { box-shadow: 4px 4px 0px 0px var(--violet); }
 .pixel-shadow-sky { box-shadow: 4px 4px 0px 0px var(--sky); }
 
 /* ── Pixel Border ── */
@@ -65,17 +69,17 @@ body {
 }
 
 .pixel-border-double {
-  border: 4px double var(--border);
+  border: 4px double var(--violet);
   border-radius: 8px;
 }
 
 /* ── Textures ── */
 .dither-check {
   background-image:
-    linear-gradient(45deg, #3B2D2608 25%, transparent 25%),
-    linear-gradient(-45deg, #3B2D2608 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #3B2D2608 75%),
-    linear-gradient(-45deg, transparent 75%, #3B2D2608 75%);
+    linear-gradient(45deg, #9b6dff06 25%, transparent 25%),
+    linear-gradient(-45deg, #9b6dff06 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #9b6dff06 75%),
+    linear-gradient(-45deg, transparent 75%, #9b6dff06 75%);
   background-size: 4px 4px;
   background-position: 0 0, 0 2px, 2px -2px, -2px 0;
 }
@@ -85,15 +89,15 @@ body {
     0deg,
     transparent,
     transparent 2px,
-    rgba(255,255,255,0.03) 2px,
-    rgba(255,255,255,0.03) 4px
+    rgba(155,109,255,0.03) 2px,
+    rgba(155,109,255,0.03) 4px
   );
 }
 
-/* ── Pixel Divider (repeating star pattern) ── */
+/* ── Pixel Divider ── */
 .pixel-divider {
   height: 16px;
-  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='7' y='2' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='5' y='4' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='9' y='4' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='3' y='6' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='7' y='6' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='11' y='6' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='5' y='8' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='9' y='8' width='2' height='2' fill='%23D4C4A8'/%3E%3Crect x='7' y='10' width='2' height='2' fill='%23D4C4A8'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='7' y='2' width='2' height='2' fill='%234a4070'/%3E%3Crect x='5' y='4' width='2' height='2' fill='%234a4070'/%3E%3Crect x='9' y='4' width='2' height='2' fill='%234a4070'/%3E%3Crect x='3' y='6' width='2' height='2' fill='%234a4070'/%3E%3Crect x='7' y='6' width='2' height='2' fill='%234a4070'/%3E%3Crect x='11' y='6' width='2' height='2' fill='%234a4070'/%3E%3Crect x='5' y='8' width='2' height='2' fill='%234a4070'/%3E%3Crect x='9' y='8' width='2' height='2' fill='%234a4070'/%3E%3Crect x='7' y='10' width='2' height='2' fill='%234a4070'/%3E%3C/svg%3E");
   background-repeat: repeat-x;
   background-size: 16px 16px;
   background-position: center;
@@ -110,7 +114,7 @@ body {
   animation: sparkle-pulse 2s ease-in-out infinite;
 }
 
-/* ── Button Press Effect ── */
+/* ── Button Press ── */
 .btn-press:active {
   transform: translate(4px, 4px) !important;
   box-shadow: none !important;
@@ -119,7 +123,7 @@ body {
 /* ── Animations ── */
 @keyframes sparkle-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.8); }
+  50% { opacity: 0.5; transform: scale(0.8); }
 }
 
 @keyframes bounce-cursor {
