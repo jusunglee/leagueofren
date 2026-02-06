@@ -233,10 +233,27 @@ Discord Bot Process
 - `riot_account_cache`: Cached Riot account lookups (24h TTL)
 - `riot_game_cache`: Cached game status checks (2min TTL)
 
+## Discord Bot Setup
+
+### Required Bot Permissions
+
+When inviting the bot to your server, use the OAuth2 URL Generator in the [Discord Developer Portal](https://discord.com/developers/applications) with these settings:
+
+**Scopes:**
+- `bot`
+- `applications.commands`
+
+**Bot Permissions:**
+- Send Messages
+- Embed Links
+- Use Slash Commands
+
+Users who run `/subscribe` or `/unsubscribe` must have the **Manage Channels** permission in the channel where they're issuing the command. The `/list` command is available to all users.
+
 ## Discord Commands
 
-- `/subscribe username:<name#tag> region:<region>` - Subscribe to a player
-- `/unsubscribe username:<name#tag> region:<region>` - Unsubscribe from a player
+- `/subscribe username:<name#tag> region:<region>` - Subscribe to a player (requires Manage Channels)
+- `/unsubscribe username:<name#tag> region:<region>` - Unsubscribe from a player (requires Manage Channels)
 - `/list` - List all subscriptions in this channel
 
 Supported regions: NA, EUW, EUNE, KR, JP, BR, LAN, LAS, OCE, TR, RU

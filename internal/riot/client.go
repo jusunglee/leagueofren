@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var ErrNotFound = errors.New("account not found")
@@ -169,6 +170,14 @@ func ParseRiotID(input string) (gameName, tagLine string, err error) {
 
 	if gameName == "" || tagLine == "" {
 		return "", "", errors.New("invalid format: name and tag cannot be empty")
+	}
+	// Use RuneCountInString because CJK characters are multi-byte in UTF-8
+	// (e.g. "玩家测试名" is 5 characters but 15 bytes), and Riot's limit is on characters.
+	if utf8.RuneCountInString(gameName) > 16 {
+		return "", "", fmt.Errorf("game name too long: max 16 characters, got %d", utf8.RuneCountInString(gameName))
+	}
+	if utf8.RuneCountInString(tagLine) > 5 {
+		return "", "", fmt.Errorf("tag too long: max 5 characters, got %d", utf8.RuneCountInString(tagLine))
 	}
 
 	return gameName, tagLine, nil

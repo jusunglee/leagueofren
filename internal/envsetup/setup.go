@@ -235,6 +235,8 @@ func (m model) View() string {
 		s.WriteString("  3. Go to the Bot section\n")
 		s.WriteString("  4. Click 'Reset Token' to get your bot token\n")
 		s.WriteString("  5. Enable 'Message Content Intent' under Privileged Gateway Intents\n")
+		s.WriteString("  6. Under OAuth2 > URL Generator, select scopes: bot, applications.commands\n")
+		s.WriteString("     and permissions: Send Messages, Embed Links, Use Slash Commands\n")
 		s.WriteString("\n")
 		s.WriteString(labelStyle.Render("Paste your Discord token here:"))
 		s.WriteString("\n")

@@ -20,6 +20,7 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db/sqlite"
 	"github.com/jusunglee/leagueofren/internal/envsetup"
 	"github.com/jusunglee/leagueofren/internal/google"
+	"github.com/jusunglee/leagueofren/internal/health"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
@@ -75,6 +76,8 @@ func mainE() error {
 		translationRetentionDuration = fs.DurationLong("translation-retention-duration", 720*time.Hour, "Duration before translations expire (default 30 days)")
 		feedbackRetentionDuration    = fs.DurationLong("feedback-retention-duration", 2160*time.Hour, "Duration before feedback expires (default 90 days)")
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
+		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
+		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -161,8 +164,18 @@ func mainE() error {
 			FeedbackRetentionDuration:    *feedbackRetentionDuration,
 			NumConsumers:                 *numConsumers,
 			GuildID:                      *guildID,
+			JobBufferSize:                int(*jobBufferSize),
 		},
 	)
+
+	healthServer := health.New(int(*healthPort))
+	go func() {
+		if err := healthServer.Start(); err != nil {
+			log.Error("health server error", "error", err)
+		}
+	}()
+	defer healthServer.Shutdown(context.Background())
+	log.InfoContext(ctx, "health server started", "port", *healthPort)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

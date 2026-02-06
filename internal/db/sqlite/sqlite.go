@@ -83,6 +83,15 @@ func (r *Repository) WithTx(ctx context.Context, fn func(repo db.Repository) err
 		return fmt.Errorf("beginning transaction: %w", err)
 	}
 
+	// If fn() panics, the normal err-check rollback below won't run.
+	// recover() catches the panic so we can roll back the tx (releasing the db connection), then re-panic.
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
 	txRepo := &Repository{
 		db:       r.db,
 		executor: tx,
