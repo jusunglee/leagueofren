@@ -1,4 +1,7 @@
-package setup
+// envsetup provides a lightweight .env configuration wizard.
+// It runs automatically on first bot startup when no .env file exists,
+// collecting Discord, Riot, and LLM credentials.
+package envsetup
 
 import (
 	"fmt"
@@ -202,7 +205,7 @@ func (m model) View() string {
 
 	switch m.step {
 	case stepWelcome:
-		s.WriteString(titleStyle.Render("Welcome to League of Ren Setup"))
+		s.WriteString(titleStyle.Render("League of Ren - Env Setup"))
 		s.WriteString("\n\n")
 		s.WriteString("This wizard will help you configure the bot.\n")
 		s.WriteString("You'll need:\n\n")

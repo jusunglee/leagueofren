@@ -443,3 +443,4 @@ Remove the TODO comment since the issue is now resolved.
 If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/jlee/.claude/projects/-Users-jlee-code-leagueofren/e1182785-7412-48b1-af5b-f20fc8798139.jsonl
 Can we "OOP-ify" the Bot struct member variables with interfaces so that the bot methods are testable? Obviously for Config, keep the struct since there's no implementation needed for tests.
 Create a code coverage test for the bot package.
+Rename setup packages for clarity: cmd/setup -> cmd/devsetup, internal/setup -> internal/envsetup

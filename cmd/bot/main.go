@@ -18,11 +18,11 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/db/postgres"
 	"github.com/jusunglee/leagueofren/internal/db/sqlite"
+	"github.com/jusunglee/leagueofren/internal/envsetup"
 	"github.com/jusunglee/leagueofren/internal/google"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
-	"github.com/jusunglee/leagueofren/internal/setup"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
@@ -43,9 +43,9 @@ func main() {
 }
 
 func mainE() error {
-	if setup.NeedsSetup() {
+	if envsetup.NeedsSetup() {
 		fmt.Println("No .env file found. Starting setup wizard...")
-		completed, err := setup.Run()
+		completed, err := envsetup.Run()
 		if err != nil {
 			return fmt.Errorf("setup wizard failed: %w", err)
 		}
