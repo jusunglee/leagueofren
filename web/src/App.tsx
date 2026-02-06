@@ -134,7 +134,7 @@ export default function App() {
             <main className="flex-1 p-4 lg:p-8">
               <Routes>
                 <Route path="/" element={<Leaderboard />} />
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/dashboard" element={<Admin />} />
               </Routes>
             </main>
           </div>
