@@ -336,19 +336,11 @@ func (r *Repository) CacheGameStatus(ctx context.Context, arg db.CacheGameStatus
 }
 
 func (r *Repository) DeleteOldTranslations(ctx context.Context, before time.Time) (int64, error) {
-	result, err := r.pool.Exec(ctx, `DELETE FROM translations WHERE created_at < $1`, before)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	return r.queries.DeleteOldTranslations(ctx, pgtype.Timestamptz{Valid: true, Time: before})
 }
 
 func (r *Repository) DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error) {
-	result, err := r.pool.Exec(ctx, `DELETE FROM feedback WHERE created_at < $1`, before)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	return r.queries.DeleteOldFeedback(ctx, pgtype.Timestamptz{Valid: true, Time: before})
 }
 
 func (r *Repository) DeleteExpiredAccountCache(ctx context.Context) error {

@@ -123,3 +123,9 @@ DELETE FROM riot_account_cache WHERE expires_at < NOW();
 
 -- name: DeleteExpiredGameCache :exec
 DELETE FROM riot_game_cache WHERE expires_at < NOW();
+
+-- name: DeleteOldTranslations :execrows
+DELETE FROM translations WHERE created_at < $1;
+
+-- name: DeleteOldFeedback :execrows
+DELETE FROM feedback WHERE created_at < $1;
