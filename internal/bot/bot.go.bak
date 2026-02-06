@@ -134,20 +134,17 @@ func (b *Bot) runProducer(ctx context.Context, ch chan<- sendMessageJob, wg *syn
 		b.log.Info("produced jobs", slog.Int("num_jobs", len(jobs)))
 
 		// Send jobs even if ctx cancelled - give them a chance to drain
-		sendTimer := time.NewTimer(time.Minute)
 		for _, job := range jobs {
-			sendTimer.Reset(time.Minute)
 			select {
-			case <-sendTimer.C:
+			case <-time.After(time.Minute):
+				// Timeout waiting to send - channel full and consumers stopped
 				b.log.Warn("timeout sending job, dropping")
-				sendTimer.Stop()
 				cancel()
 				return
 			case ch <- job:
 				b.log.InfoContext(ctx, "sent job", slog.String("channel_id", job.channelID), slog.Int64("game_id", job.gameID), slog.Int64("subscription_id", job.subscriptionID))
 			}
 		}
-		sendTimer.Stop()
 		cancel()
 
 		if err != nil {
