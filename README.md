@@ -67,11 +67,13 @@ We use Discord instead of just `/msg` -ing you in-game because it's, for good re
 
 If you're on Windows and don't want to compile anything:
 
-1. **Download** the latest `leagueofren-windows-amd64.exe` from [Releases](https://github.com/jusunglee/leagueofren/releases)
+1. **Download** the latest `leagueofren-windows-amd64.zip` from [Releases](https://github.com/jusunglee/leagueofren/releases)
 
-2. **Double-click** `leagueofren-windows-amd64.exe` to run
+2. **Unzip** the archive to a folder of your choice
 
-3. **Follow the setup wizard** - On first launch, an interactive wizard walks you through:
+3. **Double-click** `leagueofren.exe` to run
+
+4. **Follow the setup wizard** - On first launch, an interactive wizard walks you through:
    - Discord bot token setup (with link to Developer Portal)
    - Riot API key setup (with link to Developer Portal)
    - LLM provider choice (Anthropic or Google)
