@@ -1,8 +1,29 @@
 # LeagueOfRen
 
+<p>
+    <a href="https://github.com/jusunglee/leagueofren/releases"><img src="https://img.shields.io/github/release/jusunglee/leagueofren.svg" alt="Latest Release"></a>
+    <a href="https://pkg.go.dev/github.com/jusunglee/leagueofren"><img src="https://godoc.org/github.com/jusunglee/leagueofren?status.svg" alt="GoDoc"></a>
+    <a href="https://github.com/jusunglee/leagueofren/actions"><img src="https://github.com/jusunglee/leagueofren/actions/workflows/release.yml/badge.svg?branch=main" alt="Build Status"></a>
+</p>
+
 A Discord bot that translates Korean and Chinese summoner names in League of Legends games for subscribed users.
 
-We use Discord instead of just `/msg` -ing you in-game because it's, for good reason, not supported by the official riot server API. There's future plans to do this anyways with the game client API if enough people just want to deploy this locally, since you'll just be whispering to yourself.
+<figure>
+  <table>
+    <tr>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/8ac774dd-c9d5-480d-8607-8a0a0e2d3080" width="100%" />
+      </td>
+      <td align="center">
+        <img src="https://github.com/user-attachments/assets/c6e8239c-58fa-494c-8716-ee44a6b39944" width="100%" />
+      </td>
+    </tr>
+  </table>
+
+  <figcaption align="center">
+    <em>Shoutout to these 2 randos I found on porofessor's live games</em>
+  </figcaption>
+</figure>
 
 ## Overview
 
@@ -16,7 +37,8 @@ The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean a
 
 In theory, this is language-scalable but I started this project scoped down since 99% of foreign names I saw in NA were chinese and korean (I also live in NYC so I might just be region-scoped with a larger Asian population). In addition, the value of this feature rests entirely on the robustness and accuracy of the translations from the LLMs. Due to, what I think to be, a cultural phenomenon unique to Korean/Chinese communities where there's a gold mine of online content produced in their respective languages about league to provide enough context to LLM scrapers, I think these 2 languages specifically are well suited perhaps next to English to be potential language candidates for this project. I wonder if to support other languages, we'd have to use an intelligent model adapter based on the language.
 
--
+## Why Discord
+We use Discord instead of just `/msg` -ing you in-game because it's, for good reason, not supported by the official riot server API. There's future plans to do this anyways with the game client API if enough people just want to deploy this locally, since you'll just be whispering to yourself and has gutted potential for abuse.
 
 ## Features
 
@@ -211,10 +233,27 @@ Discord Bot Process
 - `riot_account_cache`: Cached Riot account lookups (24h TTL)
 - `riot_game_cache`: Cached game status checks (2min TTL)
 
+## Discord Bot Setup
+
+### Required Bot Permissions
+
+When inviting the bot to your server, use the OAuth2 URL Generator in the [Discord Developer Portal](https://discord.com/developers/applications) with these settings:
+
+**Scopes:**
+- `bot`
+- `applications.commands`
+
+**Bot Permissions:**
+- Send Messages
+- Embed Links
+- Use Slash Commands
+
+Users who run `/subscribe` or `/unsubscribe` must have the **Manage Channels** permission in the channel where they're issuing the command. The `/list` command is available to all users.
+
 ## Discord Commands
 
-- `/subscribe username:<name#tag> region:<region>` - Subscribe to a player
-- `/unsubscribe username:<name#tag> region:<region>` - Unsubscribe from a player
+- `/subscribe username:<name#tag> region:<region>` - Subscribe to a player (requires Manage Channels)
+- `/unsubscribe username:<name#tag> region:<region>` - Unsubscribe from a player (requires Manage Channels)
 - `/list` - List all subscriptions in this channel
 
 Supported regions: NA, EUW, EUNE, KR, JP, BR, LAN, LAS, OCE, TR, RU

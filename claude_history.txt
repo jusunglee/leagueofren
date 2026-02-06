@@ -443,3 +443,10 @@ Remove the TODO comment since the issue is now resolved.
 If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/jlee/.claude/projects/-Users-jlee-code-leagueofren/e1182785-7412-48b1-af5b-f20fc8798139.jsonl
 Can we "OOP-ify" the Bot struct member variables with interfaces so that the bot methods are testable? Obviously for Config, keep the struct since there's no implementation needed for tests.
 Create a code coverage test for the bot package.
+Rename setup packages for clarity: cmd/setup -> cmd/devsetup, internal/setup -> internal/envsetup
+What's the difference between the windows binary from go-release and the one from just running $env:CGO_ENABLED=0; $env:GOOS="windows"; $env:GOARCH="amd64"; go build -o bin/leagueofren-windows-amd64.exe cmd/bot/main.go? The go-release build crashes on startup but the same commit built locally as per above works fine
+what's the right command for claude mcp add-json github '{"type":"http","url":"https://api.githubcopilot.com/mcp","headers":{"Authorization":"Bearer '"$(grep GITHUB_PAT .env | cut -d '=' -f2)"'"}}'                   for windows
+(followup) backtick escaping in powershell leads to "Invalid configuration: Invalid input" - need to use single quotes or string concatenation instead
+(followup) string concatenation with single quotes also fails - need backslash escaping for external commands on Windows
+Try option B and then option A. Checkout a branch before commit + pushing the tag, and use the github MCP for checking on the action
+Implement HIGH-1 Rate Limiting on User Commands: Create RateLimiter struct (max 5 commands per 60s per user), integrate into Bot struct and handleCommand.

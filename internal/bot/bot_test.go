@@ -87,6 +87,11 @@ func (m *MockDiscordSession) GetUserID() string {
 	return ret.String(0)
 }
 
+func (m *MockDiscordSession) UserChannelPermissions(userID, channelID string, options ...discordgo.RequestOption) (int64, error) {
+	ret := m.Called(userID, channelID, options)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
 type MockRepository struct {
 	mock.Mock
 }
@@ -264,6 +269,11 @@ func (m *MockMessageServer) SendMessage(ctx context.Context, job sendMessageJob)
 	return ret.Get(0).(*discordgo.Message), ret.Error(1)
 }
 
+func (m *MockMessageServer) ReplyToMessage(channelID, messageID, content string) error {
+	ret := m.Called(channelID, messageID, content)
+	return ret.Error(0)
+}
+
 // Helper function to create a test bot
 func newTestBot(
 	log Logger,
@@ -404,7 +414,7 @@ func TestConsumeTranslationMessages(t *testing.T) {
 		mockMessageServer.AssertExpectations(t)
 	})
 
-	t.Run("transaction error", func(t *testing.T) {
+	t.Run("transaction error replies to orphaned message", func(t *testing.T) {
 		mockLogger := new(MockLogger)
 		mockSession := new(MockDiscordSession)
 		mockMessageServer := new(MockMessageServer)
@@ -427,12 +437,44 @@ func TestConsumeTranslationMessages(t *testing.T) {
 		})).Return(&discordgo.Message{ID: "msg-456"}, nil)
 
 		mockRepo.On("WithTx", mock.Anything, mock.Anything).Return(errors.New("tx error"))
+		mockMessageServer.On("ReplyToMessage", "channel-123", "msg-456", mock.Anything).Return(nil)
 
 		err := bot.consumeTranslationMessages(ctx, job)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "tx error")
-		mockMessageServer.AssertExpectations(t)
-		mockRepo.AssertExpectations(t)
+		mockMessageServer.AssertCalled(t, "ReplyToMessage", "channel-123", "msg-456", mock.Anything)
+	})
+
+	t.Run("transaction error with failed reply logs warning", func(t *testing.T) {
+		mockLogger := new(MockLogger)
+		mockSession := new(MockDiscordSession)
+		mockMessageServer := new(MockMessageServer)
+		mockRepo := new(MockRepository)
+		mockRiot := new(MockRiotClient)
+		mockTranslator := new(MockTranslator)
+
+		bot := newTestBot(mockLogger, mockSession, mockMessageServer, mockRepo, mockRiot, mockTranslator)
+
+		job := sendMessageJob{
+			username:       "TestUser",
+			translations:   []translation.Translation{{Original: "테스트", Translated: "Test"}},
+			channelID:      "channel-123",
+			subscriptionID: 1,
+			gameID:         999,
+		}
+
+		mockMessageServer.On("SendMessage", mock.Anything, mock.MatchedBy(func(j sendMessageJob) bool {
+			return j.channelID == "channel-123" && j.subscriptionID == 1
+		})).Return(&discordgo.Message{ID: "msg-456"}, nil)
+
+		mockRepo.On("WithTx", mock.Anything, mock.Anything).Return(errors.New("tx error"))
+		mockMessageServer.On("ReplyToMessage", "channel-123", "msg-456", mock.Anything).Return(errors.New("reply failed"))
+		mockLogger.On("WarnContext", mock.Anything, "failed to reply to orphaned message after transaction failure", mock.Anything).Return()
+
+		err := bot.consumeTranslationMessages(ctx, job)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "tx error")
+		mockLogger.AssertCalled(t, "WarnContext", mock.Anything, "failed to reply to orphaned message after transaction failure", mock.Anything)
 	})
 }
 

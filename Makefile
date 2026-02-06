@@ -23,7 +23,8 @@ help:
 
 # Development setup
 setup:
-	@go run cmd/setup/main.go
+	@go mod tidy
+	@go run cmd/devsetup/main.go
 
 # Docker Compose commands
 db-up:

@@ -37,6 +37,7 @@ type Bot struct {
 	riotClient    RiotClient
 	translator    Translator
 	config        Config
+	rateLimiter   *RateLimiter
 }
 
 func New(
@@ -56,6 +57,7 @@ func New(
 		riotClient:    riotClient,
 		translator:    translator,
 		config:        config,
+		rateLimiter:   NewRateLimiter(),
 	}
 }
 
@@ -272,8 +274,47 @@ func (b *Bot) handleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
+
+	if i.Member != nil && i.Member.User != nil && !b.rateLimiter.Allow(i.Member.User.ID) {
+		b.respond(s, i, "\u26a0\ufe0f You're sending commands too fast. Please wait a moment.")
+		return
+	}
+
 	var result handlerResult
 	cmd := i.ApplicationCommandData().Name
+
+	// Check permissions for subscribe/unsubscribe commands
+	if cmd == "subscribe" || cmd == "unsubscribe" {
+		if i.Member == nil {
+			result = handlerResult{
+				Response: "❌ This command can only be used in a server",
+				Err:      newUserError(fmt.Errorf("command used outside server")),
+			}
+			b.respond(s, i, result.Response)
+			return
+		}
+
+		perms, err := s.UserChannelPermissions(i.Member.User.ID, i.ChannelID)
+		if err != nil {
+			b.log.ErrorContext(ctx, "failed to check permissions", "error", err, "user_id", i.Member.User.ID, "channel_id", i.ChannelID)
+			result = handlerResult{
+				Response: "❌ Failed to verify permissions. Please try again later.",
+				Err:      fmt.Errorf("check permissions: %w", err),
+			}
+			b.respond(s, i, result.Response)
+			return
+		}
+
+		if perms&discordgo.PermissionManageChannels == 0 {
+			result = handlerResult{
+				Response: "❌ You need **Manage Channels** permission to use this command",
+				Err:      newUserError(fmt.Errorf("insufficient permissions: user %s lacks MANAGE_CHANNELS", i.Member.User.ID)),
+			}
+			b.respond(s, i, result.Response)
+			b.log.WarnContext(ctx, "permission denied", "command", cmd, "user_id", i.Member.User.ID, "channel_id", i.ChannelID)
+			return
+		}
+	}
 
 	switch cmd {
 	case "subscribe":
@@ -683,6 +724,15 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		return nil
 	})
 	if err != nil {
+		if replyErr := b.messageServer.ReplyToMessage(job.channelID, msg.ID,
+			"⚠️ Had an issue saving this result — you might see this translation again next check. Sorry!"); replyErr != nil {
+			b.log.WarnContext(ctx, "failed to reply to orphaned message after transaction failure",
+				"message_id", msg.ID,
+				"channel_id", job.channelID,
+				"reply_error", replyErr,
+				"original_error", err,
+			)
+		}
 		return err
 	}
 

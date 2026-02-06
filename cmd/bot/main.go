@@ -18,11 +18,12 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/db/postgres"
 	"github.com/jusunglee/leagueofren/internal/db/sqlite"
+	"github.com/jusunglee/leagueofren/internal/envsetup"
 	"github.com/jusunglee/leagueofren/internal/google"
+	"github.com/jusunglee/leagueofren/internal/health"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
-	"github.com/jusunglee/leagueofren/internal/setup"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
@@ -43,9 +44,9 @@ func main() {
 }
 
 func mainE() error {
-	if setup.NeedsSetup() {
+	if envsetup.NeedsSetup() {
 		fmt.Println("No .env file found. Starting setup wizard...")
-		completed, err := setup.Run()
+		completed, err := envsetup.Run()
 		if err != nil {
 			return fmt.Errorf("setup wizard failed: %w", err)
 		}
@@ -74,6 +75,7 @@ func mainE() error {
 		offlineActivityThreshold     = fs.DurationLong("offline-activity-threshold", 168*time.Hour, "Duration of inactivity before auto-unsubscribe (default 1 week)")
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
 		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
+		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -161,6 +163,15 @@ func mainE() error {
 			JobBufferSize:                int(*jobBufferSize),
 		},
 	)
+
+	healthServer := health.New(int(*healthPort))
+	go func() {
+		if err := healthServer.Start(); err != nil {
+			log.Error("health server error", "error", err)
+		}
+	}()
+	defer healthServer.Shutdown(context.Background())
+	log.InfoContext(ctx, "health server started", "port", *healthPort)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
