@@ -41,6 +41,7 @@ type PublicTranslation struct {
 	Region       string             `json:"region"`
 	SourceBotID  pgtype.Text        `json:"source_bot_id"`
 	RiotVerified bool               `json:"riot_verified"`
+	Rank         pgtype.Text        `json:"rank"`
 	Upvotes      int32              `json:"upvotes"`
 	Downvotes    int32              `json:"downvotes"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`

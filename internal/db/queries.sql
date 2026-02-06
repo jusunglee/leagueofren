@@ -135,15 +135,16 @@ DELETE FROM feedback WHERE created_at < $1;
 -- ===========================================
 
 -- name: UpsertPublicTranslation :one
-INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified, rank)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (username) DO UPDATE SET
     translation = EXCLUDED.translation,
     explanation = EXCLUDED.explanation,
     language = EXCLUDED.language,
     region = EXCLUDED.region,
     source_bot_id = EXCLUDED.source_bot_id,
-    riot_verified = EXCLUDED.riot_verified
+    riot_verified = EXCLUDED.riot_verified,
+    rank = EXCLUDED.rank
 RETURNING *;
 
 -- name: GetPublicTranslation :one

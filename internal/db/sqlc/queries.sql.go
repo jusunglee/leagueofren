@@ -568,7 +568,7 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 }
 
 const getPublicTranslation = `-- name: GetPublicTranslation :one
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations WHERE id = $1
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations WHERE id = $1
 `
 
 func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTranslation, error) {
@@ -583,6 +583,7 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTra
 		&i.Region,
 		&i.SourceBotID,
 		&i.RiotVerified,
+		&i.Rank,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
@@ -591,7 +592,7 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTra
 }
 
 const getPublicTranslationByUsername = `-- name: GetPublicTranslationByUsername :one
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations WHERE username = $1
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations WHERE username = $1
 `
 
 func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username string) (PublicTranslation, error) {
@@ -606,6 +607,7 @@ func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username s
 		&i.Region,
 		&i.SourceBotID,
 		&i.RiotVerified,
+		&i.Rank,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
@@ -844,7 +846,7 @@ func (q *Queries) ListPublicFeedback(ctx context.Context, arg ListPublicFeedback
 }
 
 const listPublicTranslationsNew = `-- name: ListPublicTranslationsNew :many
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations
 WHERE ($1::text = '' OR region = $1)
   AND ($2::text = '' OR language = $2)
 ORDER BY created_at DESC
@@ -881,6 +883,7 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 			&i.Region,
 			&i.SourceBotID,
 			&i.RiotVerified,
+			&i.Rank,
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
@@ -896,7 +899,7 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 }
 
 const listPublicTranslationsTop = `-- name: ListPublicTranslationsTop :many
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations
 WHERE ($1::text = '' OR region = $1)
   AND ($2::text = '' OR language = $2)
   AND created_at > $5
@@ -936,6 +939,7 @@ func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicT
 			&i.Region,
 			&i.SourceBotID,
 			&i.RiotVerified,
+			&i.Rank,
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
@@ -963,16 +967,17 @@ func (q *Queries) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int6
 
 const upsertPublicTranslation = `-- name: UpsertPublicTranslation :one
 
-INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified, rank)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (username) DO UPDATE SET
     translation = EXCLUDED.translation,
     explanation = EXCLUDED.explanation,
     language = EXCLUDED.language,
     region = EXCLUDED.region,
     source_bot_id = EXCLUDED.source_bot_id,
-    riot_verified = EXCLUDED.riot_verified
-RETURNING id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at
+    riot_verified = EXCLUDED.riot_verified,
+    rank = EXCLUDED.rank
+RETURNING id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at
 `
 
 type UpsertPublicTranslationParams struct {
@@ -983,6 +988,7 @@ type UpsertPublicTranslationParams struct {
 	Region       string      `json:"region"`
 	SourceBotID  pgtype.Text `json:"source_bot_id"`
 	RiotVerified bool        `json:"riot_verified"`
+	Rank         pgtype.Text `json:"rank"`
 }
 
 // ===========================================
@@ -997,6 +1003,7 @@ func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicT
 		arg.Region,
 		arg.SourceBotID,
 		arg.RiotVerified,
+		arg.Rank,
 	)
 	var i PublicTranslation
 	err := row.Scan(
@@ -1008,6 +1015,7 @@ func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicT
 		&i.Region,
 		&i.SourceBotID,
 		&i.RiotVerified,
+		&i.Rank,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,

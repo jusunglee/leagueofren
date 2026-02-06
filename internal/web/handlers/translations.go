@@ -29,6 +29,7 @@ type translationResponse struct {
 	Language     string  `json:"language"`
 	Region       string  `json:"region"`
 	RiotVerified bool    `json:"riot_verified"`
+	Rank         *string `json:"rank,omitempty"`
 	Upvotes      int32   `json:"upvotes"`
 	Downvotes    int32   `json:"downvotes"`
 	Score        float64 `json:"score,omitempty"`
@@ -60,6 +61,9 @@ func toTranslationResponse(t db.PublicTranslation) translationResponse {
 	}
 	if t.Explanation.Valid {
 		resp.Explanation = &t.Explanation.String
+	}
+	if t.Rank.Valid {
+		resp.Rank = &t.Rank.String
 	}
 	return resp
 }

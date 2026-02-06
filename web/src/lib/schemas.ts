@@ -8,6 +8,7 @@ export const translationSchema = z.object({
   language: z.string(),
   region: z.string(),
   riot_verified: z.boolean(),
+  rank: z.string().nullable().optional(),
   upvotes: z.number(),
   downvotes: z.number(),
   created_at: z.string(),

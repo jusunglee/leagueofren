@@ -371,6 +371,7 @@ func (r *Repository) UpsertPublicTranslation(ctx context.Context, arg db.UpsertP
 		Region:       arg.Region,
 		SourceBotID:  toPgText(arg.SourceBotID),
 		RiotVerified: arg.RiotVerified,
+		Rank:         toPgText(arg.Rank),
 	})
 	if err != nil {
 		return db.PublicTranslation{}, err
@@ -594,6 +595,7 @@ func convertPublicTranslation(t sqlc.PublicTranslation) db.PublicTranslation {
 		Region:       t.Region,
 		SourceBotID:  fromPgText(t.SourceBotID),
 		RiotVerified: t.RiotVerified,
+		Rank:         fromPgText(t.Rank),
 		Upvotes:      t.Upvotes,
 		Downvotes:    t.Downvotes,
 		CreatedAt:    t.CreatedAt.Time,

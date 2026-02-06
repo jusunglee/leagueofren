@@ -97,6 +97,7 @@ CREATE TABLE public_translations (
     region TEXT NOT NULL,
     source_bot_id TEXT,
     riot_verified BOOLEAN NOT NULL DEFAULT false,
+    rank TEXT,
     upvotes INT NOT NULL DEFAULT 0,
     downvotes INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

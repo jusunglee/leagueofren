@@ -1,13 +1,57 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, Flame, Sparkles, Trophy, ExternalLink, MessageCircleQuestion } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageCircleQuestion } from 'lucide-react'
 import { listTranslations, vote } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
 
-const SORT_OPTIONS: { value: SortOption; label: string; icon: typeof Flame; color: string }[] = [
-  { value: 'hot', label: 'Hot', icon: Flame, color: '#E85D75' },
-  { value: 'new', label: 'New', icon: Sparkles, color: '#FFD93D' },
-  { value: 'top', label: 'Top', icon: Trophy, color: '#F2A65A' },
+// Filled SVG icons for sort tabs
+function FlameIcon({ filled, color }: { filled: boolean; color: string }) {
+  return filled ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+  )
+}
+
+function SparklesIcon({ filled, color }: { filled: boolean; color: string }) {
+  return filled ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+  )
+}
+
+function TrophyIcon({ filled, color }: { filled: boolean; color: string }) {
+  return filled ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+  )
+}
+
+// Tiny inline SVG logos for OP.GG and Porofessor
+function OpggIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="4" fill="#5383E8"/>
+      <text x="12" y="17" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="sans-serif">O</text>
+    </svg>
+  )
+}
+
+function PorofessorIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="4" fill="#785A28"/>
+      <text x="12" y="17" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="sans-serif">P</text>
+    </svg>
+  )
+}
+
+const SORT_OPTIONS: { value: SortOption; label: string; color: string; icon: 'flame' | 'sparkles' | 'trophy' }[] = [
+  { value: 'hot', label: 'Hot', color: '#E85D75', icon: 'flame' },
+  { value: 'new', label: 'New', color: '#FFD93D', icon: 'sparkles' },
+  { value: 'top', label: 'Top', color: '#F2A65A', icon: 'trophy' },
 ]
 
 const PERIOD_OPTIONS: { value: PeriodOption; label: string }[] = [
@@ -35,6 +79,40 @@ const REGION_EMOJI: Record<string, string> = {
 const LANGUAGE_EMOJI: Record<string, string> = {
   korean: '🇰🇷',
   chinese: '🇨🇳',
+}
+
+const RANK_COLORS: Record<string, string> = {
+  IRON: '#5e5146',
+  BRONZE: '#a0715e',
+  SILVER: '#8c9ca8',
+  GOLD: '#d4a634',
+  PLATINUM: '#4e9e8e',
+  EMERALD: '#3d9e5c',
+  DIAMOND: '#576bce',
+  MASTER: '#9d48c2',
+  GRANDMASTER: '#d44545',
+  CHALLENGER: '#f4c542',
+}
+
+const RANK_EMOJI: Record<string, string> = {
+  IRON: '⚙️',
+  BRONZE: '🥉',
+  SILVER: '🥈',
+  GOLD: '🥇',
+  PLATINUM: '💎',
+  EMERALD: '💚',
+  DIAMOND: '♦️',
+  MASTER: '👑',
+  GRANDMASTER: '🔥',
+  CHALLENGER: '⚡',
+}
+
+function SortIcon({ type, filled, color }: { type: 'flame' | 'sparkles' | 'trophy'; filled: boolean; color: string }) {
+  switch (type) {
+    case 'flame': return <FlameIcon filled={filled} color={color} />
+    case 'sparkles': return <SparklesIcon filled={filled} color={color} />
+    case 'trophy': return <TrophyIcon filled={filled} color={color} />
+  }
 }
 
 function RankBadge({ index }: { index: number }) {
@@ -72,6 +150,7 @@ function TranslationCard({ t, index, onVote }: {
 }) {
   const score = t.upvotes - t.downvotes
   const isTop3 = index < 3
+  const rank = t.rank?.toUpperCase()
 
   return (
     <div
@@ -118,41 +197,50 @@ function TranslationCard({ t, index, onVote }: {
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
         )}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          {/* Region badge with flag */}
+          {/* Region badge */}
           <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
             <span className="text-sm leading-none" aria-hidden="true">{REGION_EMOJI[t.region] || '🌍'}</span>
             {t.region}
           </span>
-          {/* Language badge with flag */}
+          {/* Language badge */}
           <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
             <span className="text-sm leading-none" aria-hidden="true">{LANGUAGE_EMOJI[t.language] || '🌐'}</span>
             {t.language}
           </span>
+          {/* Rank badge */}
+          {rank && RANK_COLORS[rank] && (
+            <span
+              className="mono-font text-[10px] px-2 py-0.5 border-2 rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 font-bold text-white"
+              style={{ background: RANK_COLORS[rank], borderColor: 'var(--border)' }}
+            >
+              <span className="text-sm leading-none" aria-hidden="true">{RANK_EMOJI[rank]}</span>
+              {rank}
+            </span>
+          )}
 
-          {/* Spacer for link badges */}
           <span className="hidden lg:inline w-px h-4 bg-[var(--border-light)]" />
 
-          {/* OP.GG badge */}
+          {/* OP.GG */}
           <a
             href={buildOpggUrl(t.username, t.region)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--violet)] hover:text-white hover:border-[var(--border)] transition-all duration-150"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#5383E8] hover:text-white hover:border-[var(--border)] transition-all duration-150"
           >
-            <ExternalLink size={10} strokeWidth={2.5} />
+            <OpggIcon />
             OP.GG
           </a>
-          {/* Porofessor badge */}
+          {/* Porofessor */}
           <a
             href={buildPorofessorUrl(t.username, t.region)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--sky)] hover:text-white hover:border-[var(--border)] transition-all duration-150"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#785A28] hover:text-white hover:border-[var(--border)] transition-all duration-150"
           >
-            <ExternalLink size={10} strokeWidth={2.5} />
+            <PorofessorIcon />
             Porofessor
           </a>
-          {/* Learn More (ChatGPT) */}
+          {/* Learn More */}
           <a
             href={buildLearnMoreUrl(t.username, t.translation, t.explanation)}
             target="_blank"
@@ -207,18 +295,18 @@ export function Leaderboard() {
       {/* Controls row */}
       <div className="flex flex-wrap items-center gap-3">
         {SORT_OPTIONS.map(opt => {
-          const Icon = opt.icon
+          const isActive = sort === opt.value
           return (
             <button
               key={opt.value}
               onClick={() => { setSort(opt.value); setPage(1) }}
               className={`pixel-font text-xs px-4 lg:px-5 py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
-                sort === opt.value
+                isActive
                   ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
                   : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
               }`}
             >
-              <Icon size={14} strokeWidth={2.5} style={{ color: sort === opt.value ? 'white' : opt.color }} />
+              <SortIcon type={opt.icon} filled={isActive} color={isActive ? 'white' : opt.color} />
               {opt.label}
             </button>
           )
@@ -245,7 +333,6 @@ export function Leaderboard() {
 
         <div className="flex-1" />
 
-        {/* Filters with more spacing */}
         <div className="flex items-center gap-4">
           <select
             value={region}
