@@ -95,7 +95,7 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 echo ""
 echo "─── Done! ───"
 echo ""
-echo "  Web server: http://$(hostname -I | awk '{print $1}'):3000"
+echo "  Web server: http://$(hostname -I | awk '{print $1}')"
 echo "  Worker:     running (hourly refresh)"
 echo "  Postgres:   internal (not exposed)"
 echo ""
