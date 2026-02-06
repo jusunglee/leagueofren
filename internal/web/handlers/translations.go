@@ -8,17 +8,22 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"unicode"
 
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/riot"
+	"github.com/jusunglee/leagueofren/internal/translation"
 )
 
 type TranslationHandler struct {
-	repo db.Repository
-	log  *slog.Logger
+	repo       db.Repository
+	log        *slog.Logger
+	riot       *riot.DirectClient
+	translator *translation.Translator
 }
 
-func NewTranslationHandler(repo db.Repository, log *slog.Logger) *TranslationHandler {
-	return &TranslationHandler{repo: repo, log: log}
+func NewTranslationHandler(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, translator *translation.Translator) *TranslationHandler {
+	return &TranslationHandler{repo: repo, log: log, riot: riotClient, translator: translator}
 }
 
 type translationResponse struct {
@@ -236,13 +241,8 @@ func (h *TranslationHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 type createTranslationRequest struct {
-	Username     string  `json:"username"`
-	Translation  string  `json:"translation"`
-	Explanation  *string `json:"explanation,omitempty"`
-	Language     string  `json:"language"`
-	Region       string  `json:"region"`
-	SourceBotID  *string `json:"source_bot_id,omitempty"`
-	RiotVerified bool    `json:"riot_verified"`
+	Username string `json:"username"`
+	Region   string `json:"region"`
 }
 
 func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -252,13 +252,40 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Translation == "" || req.Language == "" || req.Region == "" {
-		writeError(w, http.StatusBadRequest, "username, translation, language, and region are required")
+	if req.Username == "" || req.Region == "" {
+		writeError(w, http.StatusBadRequest, "username and region are required")
 		return
 	}
 
+	// Validate that this is a real Riot username
+	gameName, tagLine, err := riot.ParseRiotID(req.Username)
+	if err != nil {
+		// Username might not have a tag — treat the whole thing as the game name
+		gameName = req.Username
+		tagLine = ""
+	}
+
+	if tagLine != "" {
+		_, err = h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "username not found on Riot servers")
+			return
+		}
+	}
+
+	// Server-side translation via LLM (ignores any client-provided translation)
+	translations, err := h.translator.TranslateUsernames(r.Context(), []string{gameName})
+	if err != nil || len(translations) == 0 {
+		h.log.WarnContext(r.Context(), "translation failed", "username", req.Username, "error", err)
+		writeError(w, http.StatusInternalServerError, "translation failed")
+		return
+	}
+
+	t := translations[0]
+	language := detectLanguageFromName(gameName)
+
 	var result db.PublicTranslation
-	err := h.repo.WithTx(r.Context(), func(txRepo db.Repository) error {
+	err = h.repo.WithTx(r.Context(), func(txRepo db.Repository) error {
 		_, err := txRepo.UpsertPlayer(r.Context(), db.UpsertPlayerParams{
 			Username: req.Username,
 			Region:   req.Region,
@@ -269,16 +296,13 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 		params := db.UpsertPublicTranslationParams{
 			Username:       req.Username,
-			Translation:    req.Translation,
-			Language:       req.Language,
+			Translation:    t.Translated,
+			Language:       language,
 			PlayerUsername: req.Username,
-			RiotVerified:   req.RiotVerified,
+			RiotVerified:   tagLine != "",
 		}
-		if req.Explanation != nil {
-			params.Explanation = sql.NullString{String: *req.Explanation, Valid: true}
-		}
-		if req.SourceBotID != nil {
-			params.SourceBotID = sql.NullString{String: *req.SourceBotID, Valid: true}
+		if t.Explanation != "" {
+			params.Explanation = sql.NullString{String: t.Explanation, Valid: true}
 		}
 
 		result, err = txRepo.UpsertPublicTranslation(r.Context(), params)
@@ -293,6 +317,15 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	result.Region = req.Region
 
 	writeJSON(w, http.StatusCreated, toTranslationResponse(result))
+}
+
+func detectLanguageFromName(name string) string {
+	for _, r := range name {
+		if unicode.Is(unicode.Hangul, r) {
+			return "korean"
+		}
+	}
+	return "chinese"
 }
 
 func periodCutoff(period string) time.Time {
