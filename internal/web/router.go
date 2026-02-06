@@ -11,23 +11,17 @@ import (
 	"github.com/jusunglee/leagueofren/internal/web/middleware"
 )
 
-type Config struct {
-	AdminPassword string
-}
-
 type Router struct {
 	repo       db.Repository
 	log        *slog.Logger
-	config     Config
 	riot       *riot.DirectClient
 	translator *translation.Translator
 }
 
-func NewRouter(repo db.Repository, log *slog.Logger, config Config, riotClient *riot.DirectClient, translator *translation.Translator) *Router {
+func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, translator *translation.Translator) *Router {
 	return &Router{
 		repo:       repo,
 		log:        log,
-		config:     config,
 		riot:       riotClient,
 		translator: translator,
 	}
@@ -77,14 +71,6 @@ func (r *Router) Handler() http.Handler {
 			http.HandlerFunc(feedbackHandler.Create),
 			middleware.RequestLogger(r.log),
 			middleware.RateLimit(rateLimiter),
-		),
-	)
-
-	mux.Handle("GET /admin/feedback",
-		middleware.Chain(
-			http.HandlerFunc(feedbackHandler.List),
-			middleware.RequestLogger(r.log),
-			middleware.BasicAuth(r.config.AdminPassword),
 		),
 	)
 

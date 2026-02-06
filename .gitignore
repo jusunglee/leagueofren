@@ -40,3 +40,4 @@ dist/
 # Web frontend
 web/node_modules/
 web/dist/
+cmd/web/dist/

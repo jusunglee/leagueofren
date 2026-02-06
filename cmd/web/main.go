@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +27,9 @@ import (
 	"github.com/peterbourgon/ff/v4/ffhelp"
 )
 
+//go:embed all:dist
+var staticFiles embed.FS
+
 func main() {
 	if err := mainE(); err != nil {
 		slog.Error("fatal", "error", err)
@@ -35,21 +41,20 @@ func main() {
 func mainE() error {
 	_ = godotenv.Load()
 
-	fs := ff.NewFlagSet("leagueofren-web")
+	fs_ := ff.NewFlagSet("leagueofren-web")
 
 	var (
-		port            = fs.Int64Long("port", 3000, "HTTP server port")
-		databaseURL     = fs.StringLong("database-url", "", "PostgreSQL connection URL")
-		adminPassword   = fs.StringLong("admin-password", "admin", "Admin panel password")
-		riotAPIKey      = fs.StringLong("riot-api-key", "", "Riot API key for username validation")
-		llmProvider     = fs.StringEnumLong("llm-provider", "LLM provider for server-side translation", "anthropic", "google")
-		llmModel        = fs.StringLong("llm-model", "", "LLM model name")
-		anthropicAPIKey = fs.StringLong("anthropic-api-key", "", "Anthropic API key")
-		googleAPIKey    = fs.StringLong("google-api-key", "", "Google API key")
+		port            = fs_.Int64Long("port", 3000, "HTTP server port")
+		databaseURL     = fs_.StringLong("database-url", "", "PostgreSQL connection URL")
+		riotAPIKey      = fs_.StringLong("riot-api-key", "", "Riot API key for username validation")
+		llmProvider     = fs_.StringEnumLong("llm-provider", "LLM provider for server-side translation", "anthropic", "google")
+		llmModel        = fs_.StringLong("llm-model", "", "LLM model name")
+		anthropicAPIKey = fs_.StringLong("anthropic-api-key", "", "Anthropic API key")
+		googleAPIKey    = fs_.StringLong("google-api-key", "", "Google API key")
 	)
 
-	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
-		fmt.Printf("%s\n", ffhelp.Flags(fs))
+	if err := ff.Parse(fs_, os.Args[1:], ff.WithEnvVars()); err != nil {
+		fmt.Printf("%s\n", ffhelp.Flags(fs_))
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
@@ -95,13 +100,42 @@ func mainE() error {
 	riotClient := riot.NewDirectClient(*riotAPIKey)
 	translator := translation.NewTranslator(llmClient, repo, *llmProvider, *llmModel)
 
-	router := web.NewRouter(repo, log, web.Config{
-		AdminPassword: *adminPassword,
-	}, riotClient, translator)
+	router := web.NewRouter(repo, log, riotClient, translator)
+	apiHandler := router.Handler()
+
+	// Serve API routes first, fall back to embedded static files for the SPA
+	distFS, err := fs.Sub(staticFiles, "dist")
+	if err != nil {
+		return fmt.Errorf("creating sub filesystem: %w", err)
+	}
+	fileServer := http.FileServer(http.FS(distFS))
+
+	mux := http.NewServeMux()
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// API routes go to the router
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			apiHandler.ServeHTTP(w, r)
+			return
+		}
+
+		// Try to serve a static file
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+		if _, err := fs.Stat(distFS, strings.TrimPrefix(path, "/")); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// SPA fallback: serve index.html for any unmatched path
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	}))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", *port),
-		Handler:           router.Handler(),
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
