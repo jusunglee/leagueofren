@@ -31,6 +31,8 @@ type DiscordSession interface {
 	ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	// GetUserID returns the bot's user ID
 	GetUserID() string
+	// UserChannelPermissions returns the permissions a user has in a channel
+	UserChannelPermissions(userID, channelID string, options ...discordgo.RequestOption) (int64, error)
 }
 
 // RiotClient defines the Riot API client interface used by Bot

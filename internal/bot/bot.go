@@ -274,6 +274,39 @@ func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate
 	var result handlerResult
 	cmd := i.ApplicationCommandData().Name
 
+	// Check permissions for subscribe/unsubscribe commands
+	if cmd == "subscribe" || cmd == "unsubscribe" {
+		if i.Member == nil {
+			result = handlerResult{
+				Response: "❌ This command can only be used in a server",
+				Err:      newUserError(fmt.Errorf("command used outside server")),
+			}
+			b.respond(s, i, result.Response)
+			return
+		}
+
+		perms, err := s.UserChannelPermissions(i.Member.User.ID, i.ChannelID)
+		if err != nil {
+			b.log.ErrorContext(ctx, "failed to check permissions", "error", err, "user_id", i.Member.User.ID, "channel_id", i.ChannelID)
+			result = handlerResult{
+				Response: "❌ Failed to verify permissions. Please try again later.",
+				Err:      fmt.Errorf("check permissions: %w", err),
+			}
+			b.respond(s, i, result.Response)
+			return
+		}
+
+		if perms&discordgo.PermissionManageChannels == 0 {
+			result = handlerResult{
+				Response: "❌ You need **Manage Channels** permission to use this command",
+				Err:      newUserError(fmt.Errorf("insufficient permissions: user %s lacks MANAGE_CHANNELS", i.Member.User.ID)),
+			}
+			b.respond(s, i, result.Response)
+			b.log.WarnContext(ctx, "permission denied", "command", cmd, "user_id", i.Member.User.ID, "channel_id", i.ChannelID)
+			return
+		}
+	}
+
 	switch cmd {
 	case "subscribe":
 		result = b.handleSubscribe(i)
