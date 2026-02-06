@@ -105,6 +105,17 @@ func (q *Queries) CountSubscriptionsByServer(ctx context.Context, serverID strin
 	return count, err
 }
 
+const countVotesByIP = `-- name: CountVotesByIP :one
+SELECT COUNT(*) FROM votes WHERE ip_hash = $1
+`
+
+func (q *Queries) CountVotesByIP(ctx context.Context, ipHash string) (int64, error) {
+	row := q.db.QueryRow(ctx, countVotesByIP, ipHash)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEval = `-- name: CreateEval :one
 INSERT INTO evals (subscription_id, eval_status, discord_message_id, game_id)
 VALUES ($1, $2, $3, $4)
@@ -375,16 +386,16 @@ func (q *Queries) DeleteSubscriptions(ctx context.Context, dollar_1 []int64) (in
 }
 
 const deleteVote = `-- name: DeleteVote :execrows
-DELETE FROM votes WHERE translation_id = $1 AND ip_hash = $2
+DELETE FROM votes WHERE translation_id = $1 AND visitor_id = $2
 `
 
 type DeleteVoteParams struct {
 	TranslationID int64  `json:"translation_id"`
-	IpHash        string `json:"ip_hash"`
+	VisitorID     string `json:"visitor_id"`
 }
 
 func (q *Queries) DeleteVote(ctx context.Context, arg DeleteVoteParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteVote, arg.TranslationID, arg.IpHash)
+	result, err := q.db.Exec(ctx, deleteVote, arg.TranslationID, arg.VisitorID)
 	if err != nil {
 		return 0, err
 	}
@@ -820,21 +831,22 @@ func (q *Queries) GetTranslationsForEval(ctx context.Context, evalID int64) ([]T
 }
 
 const getVote = `-- name: GetVote :one
-SELECT id, translation_id, ip_hash, vote, created_at FROM votes WHERE translation_id = $1 AND ip_hash = $2
+SELECT id, translation_id, ip_hash, visitor_id, vote, created_at FROM votes WHERE translation_id = $1 AND visitor_id = $2
 `
 
 type GetVoteParams struct {
 	TranslationID int64  `json:"translation_id"`
-	IpHash        string `json:"ip_hash"`
+	VisitorID     string `json:"visitor_id"`
 }
 
 func (q *Queries) GetVote(ctx context.Context, arg GetVoteParams) (Vote, error) {
-	row := q.db.QueryRow(ctx, getVote, arg.TranslationID, arg.IpHash)
+	row := q.db.QueryRow(ctx, getVote, arg.TranslationID, arg.VisitorID)
 	var i Vote
 	err := row.Scan(
 		&i.ID,
 		&i.TranslationID,
 		&i.IpHash,
+		&i.VisitorID,
 		&i.Vote,
 		&i.CreatedAt,
 	)
@@ -1220,25 +1232,32 @@ func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicT
 }
 
 const upsertVote = `-- name: UpsertVote :one
-INSERT INTO votes (translation_id, ip_hash, vote)
-VALUES ($1, $2, $3)
-ON CONFLICT (translation_id, ip_hash) DO UPDATE SET vote = $3
-RETURNING id, translation_id, ip_hash, vote, created_at
+INSERT INTO votes (translation_id, ip_hash, visitor_id, vote)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (translation_id, visitor_id) DO UPDATE SET vote = $4
+RETURNING id, translation_id, ip_hash, visitor_id, vote, created_at
 `
 
 type UpsertVoteParams struct {
 	TranslationID int64  `json:"translation_id"`
 	IpHash        string `json:"ip_hash"`
+	VisitorID     string `json:"visitor_id"`
 	Vote          int16  `json:"vote"`
 }
 
 func (q *Queries) UpsertVote(ctx context.Context, arg UpsertVoteParams) (Vote, error) {
-	row := q.db.QueryRow(ctx, upsertVote, arg.TranslationID, arg.IpHash, arg.Vote)
+	row := q.db.QueryRow(ctx, upsertVote,
+		arg.TranslationID,
+		arg.IpHash,
+		arg.VisitorID,
+		arg.Vote,
+	)
 	var i Vote
 	err := row.Scan(
 		&i.ID,
 		&i.TranslationID,
 		&i.IpHash,
+		&i.VisitorID,
 		&i.Vote,
 		&i.CreatedAt,
 	)

@@ -316,6 +316,11 @@ func (m *MockRepository) DeleteVote(ctx context.Context, arg db.DeleteVoteParams
 	return ret.Get(0).(int64), ret.Error(1)
 }
 
+func (m *MockRepository) CountVotesByIP(ctx context.Context, ipHash string) (int64, error) {
+	ret := m.Called(ctx, ipHash)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
 func (m *MockRepository) CreatePublicFeedback(ctx context.Context, arg db.CreatePublicFeedbackParams) (db.PublicFeedback, error) {
 	ret := m.Called(ctx, arg)
 	return ret.Get(0).(db.PublicFeedback), ret.Error(1)

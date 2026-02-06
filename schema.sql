@@ -124,9 +124,10 @@ CREATE TABLE votes (
     id BIGSERIAL PRIMARY KEY,
     translation_id BIGINT NOT NULL REFERENCES public_translations(id) ON DELETE CASCADE,
     ip_hash TEXT NOT NULL,
+    visitor_id TEXT NOT NULL,
     vote SMALLINT NOT NULL CHECK (vote IN (-1, 1)),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(translation_id, ip_hash)
+    UNIQUE(translation_id, visitor_id)
 );
 
 CREATE INDEX idx_votes_translation ON votes(translation_id);
