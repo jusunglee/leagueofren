@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, MessageCircleQuestion } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X } from 'lucide-react'
 import { listTranslations, vote } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
 
-// Filled SVG icons for sort tabs
+// ── Filled SVG icons for sort tabs ──
+
 function FlameIcon({ filled, color }: { filled: boolean; color: string }) {
   return filled ? (
     <svg width="14" height="14" viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
@@ -29,7 +30,6 @@ function TrophyIcon({ filled, color }: { filled: boolean; color: string }) {
   )
 }
 
-// Tiny inline SVG logos for OP.GG and Porofessor
 function OpggIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
@@ -48,6 +48,107 @@ function PorofessorIcon() {
   )
 }
 
+function SortIcon({ type, filled, color }: { type: 'flame' | 'sparkles' | 'trophy'; filled: boolean; color: string }) {
+  switch (type) {
+    case 'flame': return <FlameIcon filled={filled} color={color} />
+    case 'sparkles': return <SparklesIcon filled={filled} color={color} />
+    case 'trophy': return <TrophyIcon filled={filled} color={color} />
+  }
+}
+
+// ── Custom Pixel Dropdown with fuzzy search ──
+
+interface DropdownOption {
+  value: string
+  label: string
+  icon?: string
+  image?: string
+}
+
+function PixelDropdown({ options, value, onChange, placeholder }: {
+  options: DropdownOption[]
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus()
+  }, [open])
+
+  const selected = options.find(o => o.value === value)
+  const filtered = search
+    ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    : options
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => { setOpen(!open); setSearch('') }}
+        className="pixel-font text-[10px] px-3 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm tracking-wide inline-flex items-center gap-2 hover:bg-[var(--muted)] transition-all duration-150 btn-press min-w-[140px] justify-between"
+      >
+        <span className="inline-flex items-center gap-1.5 truncate">
+          {selected?.icon && <span className="text-sm">{selected.icon}</span>}
+          {selected?.image && <img src={selected.image} alt="" className="w-5 h-5 object-contain" />}
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDownIcon size={12} strokeWidth={3} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 z-50 min-w-[180px] pixel-border bg-[var(--card)] pixel-shadow-lg overflow-hidden">
+          <div className="p-2 border-b-2 border-[var(--border-light)]">
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] px-2 py-1 text-xs focus:border-[var(--violet)] focus:outline-none"
+            />
+          </div>
+          <div className="max-h-[240px] overflow-y-auto">
+            <button
+              onClick={() => { onChange(''); setOpen(false) }}
+              className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-[var(--muted)] transition-colors ${!value ? 'bg-[var(--muted)] font-bold' : ''}`}
+            >
+              {placeholder}
+            </button>
+            {filtered.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false) }}
+                className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-[var(--muted)] transition-colors ${value === opt.value ? 'bg-[var(--muted)] font-bold' : ''}`}
+              >
+                {opt.icon && <span className="text-sm">{opt.icon}</span>}
+                {opt.image && <img src={opt.image} alt="" className="w-5 h-5 object-contain" />}
+                {opt.label}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-xs text-[var(--foreground-muted)]">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Constants ──
+
 const SORT_OPTIONS: { value: SortOption; label: string; color: string; icon: 'flame' | 'sparkles' | 'trophy' }[] = [
   { value: 'hot', label: 'Hot', color: '#E85D75', icon: 'flame' },
   { value: 'new', label: 'New', color: '#FFD93D', icon: 'sparkles' },
@@ -63,36 +164,12 @@ const PERIOD_OPTIONS: { value: PeriodOption; label: string }[] = [
   { value: 'all', label: 'All Time' },
 ]
 
-const REGIONS = ['NA', 'EUW', 'EUNE', 'KR', 'JP', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'TW']
-const LANGUAGES = ['korean', 'chinese']
-
-const BADGE_COLORS = [
-  'var(--primary)', 'var(--violet)', 'var(--accent)',
-  'var(--sky)', 'var(--lavender)', 'var(--secondary)',
-]
-
 const REGION_EMOJI: Record<string, string> = {
   NA: '🇺🇸', EUW: '🇪🇺', EUNE: '🇪🇺', KR: '🇰🇷', JP: '🇯🇵',
   BR: '🇧🇷', LAN: '🌎', LAS: '🌎', OCE: '🇦🇺', TR: '🇹🇷', RU: '🇷🇺', TW: '🇹🇼',
 }
 
-const LANGUAGE_EMOJI: Record<string, string> = {
-  korean: '🇰🇷',
-  chinese: '🇨🇳',
-}
-
-const RANK_COLORS: Record<string, string> = {
-  IRON: '#5e5146',
-  BRONZE: '#a0715e',
-  SILVER: '#8c9ca8',
-  GOLD: '#d4a634',
-  PLATINUM: '#4e9e8e',
-  EMERALD: '#3d9e5c',
-  DIAMOND: '#576bce',
-  MASTER: '#9d48c2',
-  GRANDMASTER: '#d44545',
-  CHALLENGER: '#f4c542',
-}
+const LANGUAGE_EMOJI: Record<string, string> = { korean: '🇰🇷', chinese: '🇨🇳' }
 
 const RANK_EMBLEM_URL = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem'
 
@@ -109,17 +186,25 @@ const RANK_ICON: Record<string, string> = {
   CHALLENGER: `${RANK_EMBLEM_URL}/emblem-challenger.png`,
 }
 
-const ALL_RANKS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER']
+const REGION_OPTIONS: DropdownOption[] = ['NA', 'EUW', 'EUNE', 'KR', 'JP', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'TW']
+  .map(r => ({ value: r, label: r, icon: REGION_EMOJI[r] }))
 
-function SortIcon({ type, filled, color }: { type: 'flame' | 'sparkles' | 'trophy'; filled: boolean; color: string }) {
-  switch (type) {
-    case 'flame': return <FlameIcon filled={filled} color={color} />
-    case 'sparkles': return <SparklesIcon filled={filled} color={color} />
-    case 'trophy': return <TrophyIcon filled={filled} color={color} />
-  }
-}
+const LANGUAGE_OPTIONS: DropdownOption[] = [
+  { value: 'korean', label: 'Korean', icon: '🇰🇷' },
+  { value: 'chinese', label: 'Chinese', icon: '🇨🇳' },
+]
 
-function RankBadge({ index }: { index: number }) {
+const RANK_OPTIONS: DropdownOption[] = Object.entries(RANK_ICON)
+  .map(([rank, url]) => ({ value: rank, label: rank.charAt(0) + rank.slice(1).toLowerCase(), image: url }))
+
+const BADGE_COLORS = [
+  'var(--primary)', 'var(--violet)', 'var(--accent)',
+  'var(--sky)', 'var(--lavender)', 'var(--secondary)',
+]
+
+// ── Sub-components ──
+
+function ListRankBadge({ index }: { index: number }) {
   const color = BADGE_COLORS[index % BADGE_COLORS.length]
   return (
     <div
@@ -138,13 +223,11 @@ function buildLearnMoreUrl(username: string, translation: string, explanation: s
 }
 
 function buildOpggUrl(username: string, region: string) {
-  const regionSlug = region.toLowerCase()
-  return `https://www.op.gg/summoners/${regionSlug}/${encodeURIComponent(username)}`
+  return `https://www.op.gg/summoners/${region.toLowerCase()}/${encodeURIComponent(username)}`
 }
 
 function buildPorofessorUrl(username: string, region: string) {
-  const regionSlug = region.toLowerCase()
-  return `https://www.porofessor.gg/live/${regionSlug}/${encodeURIComponent(username)}`
+  return `https://www.porofessor.gg/live/${region.toLowerCase()}/${encodeURIComponent(username)}`
 }
 
 function TranslationCard({ t, index, onVote }: {
@@ -165,32 +248,20 @@ function TranslationCard({ t, index, onVote }: {
       }`}
       style={{ animationDelay: `${index * 40}ms` }}
     >
-      <RankBadge index={index} />
+      <ListRankBadge index={index} />
 
-      {/* Vote column */}
       <div className="flex flex-col items-center gap-0 min-w-[48px]">
-        <button
-          onClick={() => onVote(t.id, 1)}
-          className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--secondary)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          aria-label="Upvote"
-        >
+        <button onClick={() => onVote(t.id, 1)} className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--secondary)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Upvote">
           <ChevronUp size={24} strokeWidth={3} />
         </button>
-        <span className={`pixel-font text-sm leading-none py-1 ${
-          score > 0 ? 'text-[var(--secondary)]' : score < 0 ? 'text-[var(--destructive)]' : 'text-[var(--foreground-muted)]'
-        }`}>
+        <span className={`pixel-font text-sm leading-none py-1 ${score > 0 ? 'text-[var(--secondary)]' : score < 0 ? 'text-[var(--destructive)]' : 'text-[var(--foreground-muted)]'}`}>
           {score}
         </span>
-        <button
-          onClick={() => onVote(t.id, -1)}
-          className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--destructive)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          aria-label="Downvote"
-        >
+        <button onClick={() => onVote(t.id, -1)} className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--destructive)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Downvote">
           <ChevronDown size={24} strokeWidth={3} />
         </button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-3 flex-wrap">
           <span className="pixel-font text-base lg:text-lg text-[var(--primary)] tracking-wide">{t.username}</span>
@@ -201,58 +272,34 @@ function TranslationCard({ t, index, onVote }: {
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
         )}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          {/* Region badge */}
           <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
             <span className="text-sm leading-none" aria-hidden="true">{REGION_EMOJI[t.region] || '🌍'}</span>
             {t.region}
           </span>
-          {/* Language badge */}
           <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
             <span className="text-sm leading-none" aria-hidden="true">{LANGUAGE_EMOJI[t.language] || '🌐'}</span>
             {t.language}
           </span>
-          {/* Rank badge with official emblem */}
-          {rank && RANK_COLORS[rank] && (
-            <span
-              className="mono-font text-[10px] px-2 py-0.5 border-2 rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 font-bold text-white"
-              style={{ background: RANK_COLORS[rank], borderColor: 'var(--border)' }}
-            >
-              {RANK_ICON[rank] && <img src={RANK_ICON[rank]} alt="" className="w-4 h-4 object-contain" aria-hidden="true" />}
+          {rank && RANK_ICON[rank] && (
+            <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
+              <img src={RANK_ICON[rank]} alt="" className="w-6 h-6 object-contain" aria-hidden="true" />
               {rank}
             </span>
           )}
 
           <span className="hidden lg:inline w-px h-4 bg-[var(--border-light)]" />
 
-          {/* OP.GG */}
-          <a
-            href={buildOpggUrl(t.username, t.region)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#5383E8] hover:text-white hover:border-[var(--border)] transition-all duration-150"
-          >
-            <OpggIcon />
-            OP.GG
+          <a href={buildOpggUrl(t.username, t.region)} target="_blank" rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#5383E8] hover:text-white hover:border-[var(--border)] transition-all duration-150">
+            <OpggIcon /> OP.GG
           </a>
-          {/* Porofessor */}
-          <a
-            href={buildPorofessorUrl(t.username, t.region)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#785A28] hover:text-white hover:border-[var(--border)] transition-all duration-150"
-          >
-            <PorofessorIcon />
-            Porofessor
+          <a href={buildPorofessorUrl(t.username, t.region)} target="_blank" rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[#785A28] hover:text-white hover:border-[var(--border)] transition-all duration-150">
+            <PorofessorIcon /> Porofessor
           </a>
-          {/* Learn More */}
-          <a
-            href={buildLearnMoreUrl(t.username, t.translation, t.explanation)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--accent)] hover:text-[var(--background)] hover:border-[var(--border)] transition-all duration-150"
-          >
-            <MessageCircleQuestion size={10} strokeWidth={2.5} />
-            Learn More
+          <a href={buildLearnMoreUrl(t.username, t.translation, t.explanation)} target="_blank" rel="noopener noreferrer"
+            className="mono-font text-[10px] px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 hover:bg-[var(--accent)] hover:text-[var(--background)] hover:border-[var(--border)] transition-all duration-150">
+            <MessageCircleQuestion size={10} strokeWidth={2.5} /> Learn More
           </a>
         </div>
       </div>
@@ -271,6 +318,8 @@ function SectionMarker({ label }: { label: string }) {
     </div>
   )
 }
+
+// ── Main Component ──
 
 export function Leaderboard() {
   const queryClient = useQueryClient()
@@ -296,6 +345,7 @@ export function Leaderboard() {
     : data?.data
 
   const totalPages = data ? Math.ceil(data.pagination.total / 25) : 0
+  const hasFilters = region || language || rank
 
   return (
     <div className="space-y-6">
@@ -342,36 +392,17 @@ export function Leaderboard() {
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-4">
-          <select
-            value={region}
-            onChange={e => { setRegion(e.target.value); setPage(1) }}
-            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
-          >
-            <option value="">All Regions</option>
-            {REGIONS.map(r => <option key={r} value={r}>{REGION_EMOJI[r] || ''} {r}</option>)}
-          </select>
-          <select
-            value={language}
-            onChange={e => { setLanguage(e.target.value); setPage(1) }}
-            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
-          >
-            <option value="">All Languages</option>
-            {LANGUAGES.map(l => <option key={l} value={l}>{LANGUAGE_EMOJI[l] || ''} {l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
-          </select>
-          <select
-            value={rank}
-            onChange={e => { setRank(e.target.value); setPage(1) }}
-            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
-          >
-            <option value="">All Ranks</option>
-            {ALL_RANKS.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
-          </select>
-          {(region || language || rank) && (
+        {/* Filters — custom pixel dropdowns */}
+        <div className="flex items-center gap-3">
+          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
+          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
+          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
+          {hasFilters && (
             <button
               onClick={() => { setRegion(''); setLanguage(''); setRank(''); setPage(1) }}
-              className="text-xs px-3 py-1.5 border-2 border-dashed border-[var(--border-light)] rounded-[4px] text-[var(--foreground-muted)] hover:border-solid hover:bg-[var(--muted)] transition-all"
+              className="pixel-font text-[10px] px-3 py-2 bg-[var(--destructive)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[#b83a30] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-1"
             >
+              <X size={12} strokeWidth={3} />
               Clear
             </button>
           )}
