@@ -6,7 +6,6 @@ bin/
 *.so
 *.dylib
 tmp/
-*.html
 
 # Test binary
 *.test
