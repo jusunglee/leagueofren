@@ -51,6 +51,7 @@ type Vote struct {
 	ID            int64
 	TranslationID int64
 	IpHash        string
+	VisitorID     string
 	Vote          int16
 	CreatedAt     time.Time
 }
@@ -97,17 +98,18 @@ type CountPublicTranslationsParams struct {
 type UpsertVoteParams struct {
 	TranslationID int64
 	IpHash        string
+	VisitorID     string
 	Vote          int16
 }
 
 type GetVoteParams struct {
 	TranslationID int64
-	IpHash        string
+	VisitorID     string
 }
 
 type DeleteVoteParams struct {
 	TranslationID int64
-	IpHash        string
+	VisitorID     string
 }
 
 type CreatePublicFeedbackParams struct {
@@ -349,6 +351,7 @@ type Repository interface {
 	UpsertVote(ctx context.Context, arg UpsertVoteParams) (Vote, error)
 	GetVote(ctx context.Context, arg GetVoteParams) (Vote, error)
 	DeleteVote(ctx context.Context, arg DeleteVoteParams) (int64, error)
+	CountVotesByIP(ctx context.Context, ipHash string) (int64, error)
 
 	// Public Feedback
 	CreatePublicFeedback(ctx context.Context, arg CreatePublicFeedbackParams) (PublicFeedback, error)

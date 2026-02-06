@@ -534,6 +534,7 @@ func (r *Repository) UpsertVote(ctx context.Context, arg db.UpsertVoteParams) (d
 	result, err := r.queries.UpsertVote(ctx, sqlc.UpsertVoteParams{
 		TranslationID: arg.TranslationID,
 		IpHash:        arg.IpHash,
+		VisitorID:     arg.VisitorID,
 		Vote:          arg.Vote,
 	})
 	if err != nil {
@@ -545,7 +546,7 @@ func (r *Repository) UpsertVote(ctx context.Context, arg db.UpsertVoteParams) (d
 func (r *Repository) GetVote(ctx context.Context, arg db.GetVoteParams) (db.Vote, error) {
 	result, err := r.queries.GetVote(ctx, sqlc.GetVoteParams{
 		TranslationID: arg.TranslationID,
-		IpHash:        arg.IpHash,
+		VisitorID:     arg.VisitorID,
 	})
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -559,8 +560,12 @@ func (r *Repository) GetVote(ctx context.Context, arg db.GetVoteParams) (db.Vote
 func (r *Repository) DeleteVote(ctx context.Context, arg db.DeleteVoteParams) (int64, error) {
 	return r.queries.DeleteVote(ctx, sqlc.DeleteVoteParams{
 		TranslationID: arg.TranslationID,
-		IpHash:        arg.IpHash,
+		VisitorID:     arg.VisitorID,
 	})
+}
+
+func (r *Repository) CountVotesByIP(ctx context.Context, ipHash string) (int64, error) {
+	return r.queries.CountVotesByIP(ctx, ipHash)
 }
 
 // Public Feedback methods
@@ -703,6 +708,7 @@ func convertVote(v sqlc.Vote) db.Vote {
 		ID:            v.ID,
 		TranslationID: v.TranslationID,
 		IpHash:        v.IpHash,
+		VisitorID:     v.VisitorID,
 		Vote:          v.Vote,
 		CreatedAt:     v.CreatedAt.Time,
 	}

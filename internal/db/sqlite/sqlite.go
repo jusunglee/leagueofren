@@ -575,6 +575,10 @@ func (r *Repository) CountPublicFeedback(_ context.Context) (int64, error) {
 	return 0, fmt.Errorf("public feedback not supported in SQLite mode")
 }
 
+func (r *Repository) CountVotesByIP(_ context.Context, _ string) (int64, error) {
+	return 0, fmt.Errorf("votes not supported in SQLite mode")
+}
+
 // Helper functions
 
 func scanSubscription(row *sql.Row) (db.Subscription, error) {

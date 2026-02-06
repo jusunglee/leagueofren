@@ -230,16 +230,19 @@ UPDATE public_translations SET downvotes = downvotes + 1 WHERE id = $1;
 UPDATE public_translations SET downvotes = downvotes - 1 WHERE id = $1;
 
 -- name: UpsertVote :one
-INSERT INTO votes (translation_id, ip_hash, vote)
-VALUES ($1, $2, $3)
-ON CONFLICT (translation_id, ip_hash) DO UPDATE SET vote = $3
+INSERT INTO votes (translation_id, ip_hash, visitor_id, vote)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (translation_id, visitor_id) DO UPDATE SET vote = $4
 RETURNING *;
 
 -- name: GetVote :one
-SELECT * FROM votes WHERE translation_id = $1 AND ip_hash = $2;
+SELECT * FROM votes WHERE translation_id = $1 AND visitor_id = $2;
 
 -- name: DeleteVote :execrows
-DELETE FROM votes WHERE translation_id = $1 AND ip_hash = $2;
+DELETE FROM votes WHERE translation_id = $1 AND visitor_id = $2;
+
+-- name: CountVotesByIP :one
+SELECT COUNT(*) FROM votes WHERE ip_hash = $1;
 
 -- name: CreatePublicFeedback :one
 INSERT INTO public_feedback (translation_id, ip_hash, feedback_text)

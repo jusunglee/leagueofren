@@ -105,6 +105,7 @@ type Vote struct {
 	ID            int64              `json:"id"`
 	TranslationID int64              `json:"translation_id"`
 	IpHash        string             `json:"ip_hash"`
+	VisitorID     string             `json:"visitor_id"`
 	Vote          int16              `json:"vote"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
