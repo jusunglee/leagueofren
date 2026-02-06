@@ -332,6 +332,7 @@ export function Leaderboard() {
   const [region, setRegion] = useState('')
   const [language, setLanguage] = useState('')
   const [rank, setRank] = useState('')
+  const [champion, setChampion] = useState('')
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
@@ -344,12 +345,24 @@ export function Leaderboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['translations'] }),
   })
 
-  const filteredData = rank && data?.data
-    ? data.data.filter(t => t.rank?.toUpperCase() === rank)
-    : data?.data
+  const filteredData = data?.data.filter(t => {
+    if (rank && t.rank?.toUpperCase() !== rank) return false
+    if (champion && !t.top_champions?.includes(champion)) return false
+    return true
+  }) ?? undefined
+
+  // Build champion options from loaded data
+  const championOptions: DropdownOption[] = (() => {
+    if (!data?.data) return []
+    const champs = new Set<string>()
+    for (const t of data.data) {
+      t.top_champions?.forEach(c => champs.add(c))
+    }
+    return Array.from(champs).sort().map(c => ({ value: c, label: c, icon: '⚔️' }))
+  })()
 
   const totalPages = data ? Math.ceil(data.pagination.total / 25) : 0
-  const hasFilters = region || language || rank
+  const hasFilters = region || language || rank || champion
 
   return (
     <div className="space-y-6">
@@ -390,9 +403,10 @@ export function Leaderboard() {
           <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
           <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
           <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
+          <PixelDropdown options={championOptions} value={champion} onChange={v => { setChampion(v); setPage(1) }} placeholder="All Champions" />
           {hasFilters && (
             <button
-              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setPage(1) }}
+              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setChampion(''); setPage(1) }}
               className="pixel-font text-[10px] px-3 py-2 bg-[var(--destructive)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[#b83a30] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-1"
             >
               <X size={12} strokeWidth={3} />
