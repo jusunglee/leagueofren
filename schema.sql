@@ -82,3 +82,50 @@ CREATE TABLE riot_game_cache (
 );
 
 CREATE INDEX idx_riot_game_cache_expires ON riot_game_cache(expires_at);
+
+-- ===========================================
+-- Companion Website Tables
+-- ===========================================
+
+-- Public translations submitted by bot users (opt-in)
+CREATE TABLE public_translations (
+    id BIGSERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    translation TEXT NOT NULL,
+    explanation TEXT,
+    language TEXT NOT NULL,
+    region TEXT NOT NULL,
+    source_bot_id TEXT,
+    riot_verified BOOLEAN NOT NULL DEFAULT false,
+    upvotes INT NOT NULL DEFAULT 0,
+    downvotes INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX idx_public_translations_username ON public_translations(username);
+CREATE INDEX idx_public_translations_hot ON public_translations(upvotes, downvotes, created_at);
+CREATE INDEX idx_public_translations_created ON public_translations(created_at);
+
+-- IP-based vote tracking (no login required, one vote per IP per translation)
+CREATE TABLE votes (
+    id BIGSERIAL PRIMARY KEY,
+    translation_id BIGINT NOT NULL REFERENCES public_translations(id) ON DELETE CASCADE,
+    ip_hash TEXT NOT NULL,
+    vote SMALLINT NOT NULL CHECK (vote IN (-1, 1)),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(translation_id, ip_hash)
+);
+
+CREATE INDEX idx_votes_translation ON votes(translation_id);
+
+-- Public feedback on translations (visible in admin panel only)
+CREATE TABLE public_feedback (
+    id BIGSERIAL PRIMARY KEY,
+    translation_id BIGINT NOT NULL REFERENCES public_translations(id) ON DELETE CASCADE,
+    ip_hash TEXT NOT NULL,
+    feedback_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_public_feedback_translation ON public_feedback(translation_id);
+CREATE INDEX idx_public_feedback_created ON public_feedback(created_at);

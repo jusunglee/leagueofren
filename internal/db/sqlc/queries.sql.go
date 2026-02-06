@@ -61,6 +61,35 @@ func (q *Queries) CacheGameStatus(ctx context.Context, arg CacheGameStatusParams
 	return err
 }
 
+const countPublicFeedback = `-- name: CountPublicFeedback :one
+SELECT COUNT(*) FROM public_feedback
+`
+
+func (q *Queries) CountPublicFeedback(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicFeedback)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPublicTranslations = `-- name: CountPublicTranslations :one
+SELECT COUNT(*) FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2)
+`
+
+type CountPublicTranslationsParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+}
+
+func (q *Queries) CountPublicTranslations(ctx context.Context, arg CountPublicTranslationsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicTranslations, arg.Column1, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSubscriptionsByServer = `-- name: CountSubscriptionsByServer :one
 SELECT COUNT(*)
 FROM subscriptions
@@ -123,6 +152,31 @@ func (q *Queries) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.DiscordMessageID,
+		&i.FeedbackText,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createPublicFeedback = `-- name: CreatePublicFeedback :one
+INSERT INTO public_feedback (translation_id, ip_hash, feedback_text)
+VALUES ($1, $2, $3)
+RETURNING id, translation_id, ip_hash, feedback_text, created_at
+`
+
+type CreatePublicFeedbackParams struct {
+	TranslationID int64  `json:"translation_id"`
+	IpHash        string `json:"ip_hash"`
+	FeedbackText  string `json:"feedback_text"`
+}
+
+func (q *Queries) CreatePublicFeedback(ctx context.Context, arg CreatePublicFeedbackParams) (PublicFeedback, error) {
+	row := q.db.QueryRow(ctx, createPublicFeedback, arg.TranslationID, arg.IpHash, arg.FeedbackText)
+	var i PublicFeedback
+	err := row.Scan(
+		&i.ID,
+		&i.TranslationID,
+		&i.IpHash,
 		&i.FeedbackText,
 		&i.CreatedAt,
 	)
@@ -212,6 +266,24 @@ func (q *Queries) CreateTranslationToEval(ctx context.Context, arg CreateTransla
 	return err
 }
 
+const decrementDownvotes = `-- name: DecrementDownvotes :exec
+UPDATE public_translations SET downvotes = downvotes - 1 WHERE id = $1
+`
+
+func (q *Queries) DecrementDownvotes(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, decrementDownvotes, id)
+	return err
+}
+
+const decrementUpvotes = `-- name: DecrementUpvotes :exec
+UPDATE public_translations SET upvotes = upvotes - 1 WHERE id = $1
+`
+
+func (q *Queries) DecrementUpvotes(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, decrementUpvotes, id)
+	return err
+}
+
 const deleteEvals = `-- name: DeleteEvals :execrows
 DELETE FROM evals
 WHERE evaluated_at < $1
@@ -294,6 +366,23 @@ WHERE id=ANY($1::bigint[])
 
 func (q *Queries) DeleteSubscriptions(ctx context.Context, dollar_1 []int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSubscriptions, dollar_1)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteVote = `-- name: DeleteVote :execrows
+DELETE FROM votes WHERE translation_id = $1 AND ip_hash = $2
+`
+
+type DeleteVoteParams struct {
+	TranslationID int64  `json:"translation_id"`
+	IpHash        string `json:"ip_hash"`
+}
+
+func (q *Queries) DeleteVote(ctx context.Context, arg DeleteVoteParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteVote, arg.TranslationID, arg.IpHash)
 	if err != nil {
 		return 0, err
 	}
@@ -478,6 +567,52 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 	return i, err
 }
 
+const getPublicTranslation = `-- name: GetPublicTranslation :one
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations WHERE id = $1
+`
+
+func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTranslation, error) {
+	row := q.db.QueryRow(ctx, getPublicTranslation, id)
+	var i PublicTranslation
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Translation,
+		&i.Explanation,
+		&i.Language,
+		&i.Region,
+		&i.SourceBotID,
+		&i.RiotVerified,
+		&i.Upvotes,
+		&i.Downvotes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPublicTranslationByUsername = `-- name: GetPublicTranslationByUsername :one
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations WHERE username = $1
+`
+
+func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username string) (PublicTranslation, error) {
+	row := q.db.QueryRow(ctx, getPublicTranslationByUsername, username)
+	var i PublicTranslation
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Translation,
+		&i.Explanation,
+		&i.Language,
+		&i.Region,
+		&i.SourceBotID,
+		&i.RiotVerified,
+		&i.Upvotes,
+		&i.Downvotes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
 SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at FROM subscriptions
 WHERE id = $1
@@ -617,6 +752,204 @@ func (q *Queries) GetTranslationsForEval(ctx context.Context, evalID int64) ([]T
 	return items, nil
 }
 
+const getVote = `-- name: GetVote :one
+SELECT id, translation_id, ip_hash, vote, created_at FROM votes WHERE translation_id = $1 AND ip_hash = $2
+`
+
+type GetVoteParams struct {
+	TranslationID int64  `json:"translation_id"`
+	IpHash        string `json:"ip_hash"`
+}
+
+func (q *Queries) GetVote(ctx context.Context, arg GetVoteParams) (Vote, error) {
+	row := q.db.QueryRow(ctx, getVote, arg.TranslationID, arg.IpHash)
+	var i Vote
+	err := row.Scan(
+		&i.ID,
+		&i.TranslationID,
+		&i.IpHash,
+		&i.Vote,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const incrementDownvotes = `-- name: IncrementDownvotes :exec
+UPDATE public_translations SET downvotes = downvotes + 1 WHERE id = $1
+`
+
+func (q *Queries) IncrementDownvotes(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, incrementDownvotes, id)
+	return err
+}
+
+const incrementUpvotes = `-- name: IncrementUpvotes :exec
+UPDATE public_translations SET upvotes = upvotes + 1 WHERE id = $1
+`
+
+func (q *Queries) IncrementUpvotes(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, incrementUpvotes, id)
+	return err
+}
+
+const listPublicFeedback = `-- name: ListPublicFeedback :many
+SELECT pf.id, pf.translation_id, pf.ip_hash, pf.feedback_text, pf.created_at, pt.username, pt.translation
+FROM public_feedback pf
+JOIN public_translations pt ON pt.id = pf.translation_id
+ORDER BY pf.created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListPublicFeedbackParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListPublicFeedbackRow struct {
+	ID            int64              `json:"id"`
+	TranslationID int64              `json:"translation_id"`
+	IpHash        string             `json:"ip_hash"`
+	FeedbackText  string             `json:"feedback_text"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Username      string             `json:"username"`
+	Translation   string             `json:"translation"`
+}
+
+func (q *Queries) ListPublicFeedback(ctx context.Context, arg ListPublicFeedbackParams) ([]ListPublicFeedbackRow, error) {
+	rows, err := q.db.Query(ctx, listPublicFeedback, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicFeedbackRow{}
+	for rows.Next() {
+		var i ListPublicFeedbackRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TranslationID,
+			&i.IpHash,
+			&i.FeedbackText,
+			&i.CreatedAt,
+			&i.Username,
+			&i.Translation,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicTranslationsNew = `-- name: ListPublicTranslationsNew :many
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2)
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $4
+`
+
+type ListPublicTranslationsNewParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicTranslationsNewParams) ([]PublicTranslation, error) {
+	rows, err := q.db.Query(ctx, listPublicTranslationsNew,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PublicTranslation{}
+	for rows.Next() {
+		var i PublicTranslation
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Translation,
+			&i.Explanation,
+			&i.Language,
+			&i.Region,
+			&i.SourceBotID,
+			&i.RiotVerified,
+			&i.Upvotes,
+			&i.Downvotes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicTranslationsTop = `-- name: ListPublicTranslationsTop :many
+SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at FROM public_translations
+WHERE ($1::text = '' OR region = $1)
+  AND ($2::text = '' OR language = $2)
+  AND created_at > $5
+ORDER BY (upvotes - downvotes) DESC, created_at DESC
+LIMIT $3 OFFSET $4
+`
+
+type ListPublicTranslationsTopParams struct {
+	Column1   string             `json:"column_1"`
+	Column2   string             `json:"column_2"`
+	Limit     int32              `json:"limit"`
+	Offset    int32              `json:"offset"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicTranslationsTopParams) ([]PublicTranslation, error) {
+	rows, err := q.db.Query(ctx, listPublicTranslationsTop,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+		arg.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PublicTranslation{}
+	for rows.Next() {
+		var i PublicTranslation
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Translation,
+			&i.Explanation,
+			&i.Language,
+			&i.Region,
+			&i.SourceBotID,
+			&i.RiotVerified,
+			&i.Upvotes,
+			&i.Downvotes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateSubscriptionLastEvaluatedAt = `-- name: UpdateSubscriptionLastEvaluatedAt :exec
 UPDATE subscriptions
 SET last_evaluated_at = NOW()
@@ -626,4 +959,84 @@ WHERE id = $1
 func (q *Queries) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, updateSubscriptionLastEvaluatedAt, id)
 	return err
+}
+
+const upsertPublicTranslation = `-- name: UpsertPublicTranslation :one
+
+INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (username) DO UPDATE SET
+    translation = EXCLUDED.translation,
+    explanation = EXCLUDED.explanation,
+    language = EXCLUDED.language,
+    region = EXCLUDED.region,
+    source_bot_id = EXCLUDED.source_bot_id,
+    riot_verified = EXCLUDED.riot_verified
+RETURNING id, username, translation, explanation, language, region, source_bot_id, riot_verified, upvotes, downvotes, created_at
+`
+
+type UpsertPublicTranslationParams struct {
+	Username     string      `json:"username"`
+	Translation  string      `json:"translation"`
+	Explanation  pgtype.Text `json:"explanation"`
+	Language     string      `json:"language"`
+	Region       string      `json:"region"`
+	SourceBotID  pgtype.Text `json:"source_bot_id"`
+	RiotVerified bool        `json:"riot_verified"`
+}
+
+// ===========================================
+// Companion Website Queries
+// ===========================================
+func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicTranslationParams) (PublicTranslation, error) {
+	row := q.db.QueryRow(ctx, upsertPublicTranslation,
+		arg.Username,
+		arg.Translation,
+		arg.Explanation,
+		arg.Language,
+		arg.Region,
+		arg.SourceBotID,
+		arg.RiotVerified,
+	)
+	var i PublicTranslation
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Translation,
+		&i.Explanation,
+		&i.Language,
+		&i.Region,
+		&i.SourceBotID,
+		&i.RiotVerified,
+		&i.Upvotes,
+		&i.Downvotes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const upsertVote = `-- name: UpsertVote :one
+INSERT INTO votes (translation_id, ip_hash, vote)
+VALUES ($1, $2, $3)
+ON CONFLICT (translation_id, ip_hash) DO UPDATE SET vote = $3
+RETURNING id, translation_id, ip_hash, vote, created_at
+`
+
+type UpsertVoteParams struct {
+	TranslationID int64  `json:"translation_id"`
+	IpHash        string `json:"ip_hash"`
+	Vote          int16  `json:"vote"`
+}
+
+func (q *Queries) UpsertVote(ctx context.Context, arg UpsertVoteParams) (Vote, error) {
+	row := q.db.QueryRow(ctx, upsertVote, arg.TranslationID, arg.IpHash, arg.Vote)
+	var i Vote
+	err := row.Scan(
+		&i.ID,
+		&i.TranslationID,
+		&i.IpHash,
+		&i.Vote,
+		&i.CreatedAt,
+	)
+	return i, err
 }

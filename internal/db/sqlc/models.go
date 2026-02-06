@@ -24,6 +24,28 @@ type Feedback struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type PublicFeedback struct {
+	ID            int64              `json:"id"`
+	TranslationID int64              `json:"translation_id"`
+	IpHash        string             `json:"ip_hash"`
+	FeedbackText  string             `json:"feedback_text"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type PublicTranslation struct {
+	ID           int64              `json:"id"`
+	Username     string             `json:"username"`
+	Translation  string             `json:"translation"`
+	Explanation  pgtype.Text        `json:"explanation"`
+	Language     string             `json:"language"`
+	Region       string             `json:"region"`
+	SourceBotID  pgtype.Text        `json:"source_bot_id"`
+	RiotVerified bool               `json:"riot_verified"`
+	Upvotes      int32              `json:"upvotes"`
+	Downvotes    int32              `json:"downvotes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type RiotAccountCache struct {
 	ID        int64              `json:"id"`
 	GameName  string             `json:"game_name"`
@@ -67,4 +89,12 @@ type Translation struct {
 type TranslationToEval struct {
 	TranslationID int64 `json:"translation_id"`
 	EvalID        int64 `json:"eval_id"`
+}
+
+type Vote struct {
+	ID            int64              `json:"id"`
+	TranslationID int64              `json:"translation_id"`
+	IpHash        string             `json:"ip_hash"`
+	Vote          int16              `json:"vote"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
