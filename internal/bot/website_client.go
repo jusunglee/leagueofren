@@ -14,16 +14,14 @@ import (
 // WebsiteClient submits translations to the companion website API.
 // If URL is empty, all calls are no-ops (opt-out by default).
 type WebsiteClient struct {
-	url    string
-	apiKey string
-	http   *http.Client
+	url  string
+	http *http.Client
 }
 
-func NewWebsiteClient(url, apiKey string) *WebsiteClient {
+func NewWebsiteClient(url string) *WebsiteClient {
 	return &WebsiteClient{
-		url:    url,
-		apiKey: apiKey,
-		http:   &http.Client{Timeout: 10 * time.Second},
+		url:  url,
+		http: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -67,9 +65,6 @@ func (w *WebsiteClient) SubmitTranslations(ctx context.Context, translations []t
 			return fmt.Errorf("creating request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		if w.apiKey != "" {
-			req.Header.Set("X-API-Key", w.apiKey)
-		}
 
 		resp, err := w.http.Do(req)
 		if err != nil {

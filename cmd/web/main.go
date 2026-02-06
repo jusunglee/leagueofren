@@ -36,8 +36,6 @@ func mainE() error {
 		port          = fs.Int64Long("port", 3000, "HTTP server port")
 		databaseURL   = fs.StringLong("database-url", "", "PostgreSQL connection URL")
 		adminPassword = fs.StringLong("admin-password", "admin", "Admin panel password")
-		apiKey        = fs.StringLong("api-key", "", "API key for bot submission auth")
-		riotAPIKey    = fs.StringLong("riot-api-key", "", "Riot API key for username verification")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -62,8 +60,6 @@ func mainE() error {
 
 	router := web.NewRouter(repo, log, web.Config{
 		AdminPassword: *adminPassword,
-		APIKey:        *apiKey,
-		RiotAPIKey:    *riotAPIKey,
 	})
 
 	server := &http.Server{

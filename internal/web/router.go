@@ -11,8 +11,6 @@ import (
 
 type Config struct {
 	AdminPassword string
-	APIKey        string
-	RiotAPIKey    string
 }
 
 type Router struct {
@@ -56,7 +54,7 @@ func (r *Router) Handler() http.Handler {
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.Create),
 			middleware.RequestLogger(r.log),
-			middleware.APIKeyAuth(r.config.APIKey),
+			middleware.RateLimit(rateLimiter),
 		),
 	)
 
