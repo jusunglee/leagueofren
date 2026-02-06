@@ -452,3 +452,8 @@ what's the right command for claude mcp add-json github '{"type":"http","url":"h
 (followup) backtick escaping in powershell leads to "Invalid configuration: Invalid input" - need to use single quotes or string concatenation instead
 (followup) string concatenation with single quotes also fails - need backslash escaping for external commands on Windows
 Try option B and then option A. Checkout a branch before commit + pushing the tag, and use the github MCP for checking on the action
+Regenerate frontend design with Indie Pixel, add about section and CTA linking to repo
+Dark mode Celeste palette (violets/blues), fix responsive layout to prioritize desktop
+Celeste dark palette, desktop-first responsive, remove hero, keep banner + submit button
+Filled sort icons, official op.gg/porofessor icons, add rank to schema
+Split players table + background worker for rank/mastery refresh

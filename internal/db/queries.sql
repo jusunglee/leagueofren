@@ -134,44 +134,88 @@ DELETE FROM feedback WHERE created_at < $1;
 -- Companion Website Queries
 -- ===========================================
 
+-- Player queries
+
+-- name: UpsertPlayer :one
+INSERT INTO players (username, region, rank, top_champions, puuid)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (username) DO UPDATE SET
+    region = EXCLUDED.region,
+    rank = COALESCE(EXCLUDED.rank, players.rank),
+    top_champions = COALESCE(EXCLUDED.top_champions, players.top_champions),
+    puuid = COALESCE(EXCLUDED.puuid, players.puuid),
+    last_updated = NOW()
+RETURNING *;
+
+-- name: GetPlayer :one
+SELECT * FROM players WHERE username = $1;
+
+-- name: ListAllPlayers :many
+SELECT * FROM players ORDER BY username;
+
+-- name: UpdatePlayerStats :exec
+UPDATE players SET rank = $2, top_champions = $3, last_updated = NOW()
+WHERE username = $1;
+
+-- Public translation queries (JOIN against players for region/rank/top_champions)
+
 -- name: UpsertPublicTranslation :one
-INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified, rank)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO public_translations (username, translation, explanation, language, player_username, source_bot_id, riot_verified)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (username) DO UPDATE SET
     translation = EXCLUDED.translation,
     explanation = EXCLUDED.explanation,
     language = EXCLUDED.language,
-    region = EXCLUDED.region,
+    player_username = EXCLUDED.player_username,
     source_bot_id = EXCLUDED.source_bot_id,
-    riot_verified = EXCLUDED.riot_verified,
-    rank = EXCLUDED.rank
+    riot_verified = EXCLUDED.riot_verified
 RETURNING *;
 
 -- name: GetPublicTranslation :one
-SELECT * FROM public_translations WHERE id = $1;
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE pt.id = $1;
 
 -- name: GetPublicTranslationByUsername :one
-SELECT * FROM public_translations WHERE username = $1;
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE pt.username = $1;
 
 -- name: ListPublicTranslationsNew :many
-SELECT * FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2)
-ORDER BY created_at DESC
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2)
+ORDER BY pt.created_at DESC
 LIMIT $3 OFFSET $4;
 
 -- name: ListPublicTranslationsTop :many
-SELECT * FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2)
-  AND created_at > $5
-ORDER BY (upvotes - downvotes) DESC, created_at DESC
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2)
+  AND pt.created_at > $5
+ORDER BY (pt.upvotes - pt.downvotes) DESC, pt.created_at DESC
 LIMIT $3 OFFSET $4;
 
 -- name: CountPublicTranslations :one
-SELECT COUNT(*) FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2);
+SELECT COUNT(*)
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2);
 
 -- name: IncrementUpvotes :exec
 UPDATE public_translations SET upvotes = upvotes + 1 WHERE id = $1;

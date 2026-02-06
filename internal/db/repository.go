@@ -6,7 +6,30 @@ import (
 	"time"
 )
 
-// PublicTranslation represents a community-visible translation with vote counts
+type Player struct {
+	Username     string
+	Region       string
+	Rank         sql.NullString
+	TopChampions sql.NullString
+	Puuid        sql.NullString
+	FirstSeen    time.Time
+	LastUpdated  time.Time
+}
+
+type UpsertPlayerParams struct {
+	Username     string
+	Region       string
+	Rank         sql.NullString
+	TopChampions sql.NullString
+	Puuid        sql.NullString
+}
+
+type UpdatePlayerStatsParams struct {
+	Username     string
+	Rank         sql.NullString
+	TopChampions sql.NullString
+}
+
 type PublicTranslation struct {
 	ID           int64
 	Username     string
@@ -17,6 +40,7 @@ type PublicTranslation struct {
 	SourceBotID  sql.NullString
 	RiotVerified bool
 	Rank         sql.NullString
+	TopChampions sql.NullString
 	Upvotes      int32
 	Downvotes    int32
 	CreatedAt    time.Time
@@ -41,14 +65,13 @@ type PublicFeedback struct {
 }
 
 type UpsertPublicTranslationParams struct {
-	Username     string
-	Translation  string
-	Explanation  sql.NullString
-	Language     string
-	Region       string
-	SourceBotID  sql.NullString
-	RiotVerified bool
-	Rank         sql.NullString
+	Username       string
+	Translation    string
+	Explanation    sql.NullString
+	Language       string
+	PlayerUsername string
+	SourceBotID    sql.NullString
+	RiotVerified   bool
 }
 
 type ListPublicTranslationsNewParams struct {
@@ -303,6 +326,12 @@ type Repository interface {
 	DeleteOldFeedback(ctx context.Context, before time.Time) (int64, error)
 	DeleteExpiredAccountCache(ctx context.Context) error
 	DeleteExpiredGameCache(ctx context.Context) error
+
+	// Players
+	UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) (Player, error)
+	GetPlayer(ctx context.Context, username string) (Player, error)
+	ListAllPlayers(ctx context.Context) ([]Player, error)
+	UpdatePlayerStats(ctx context.Context, arg UpdatePlayerStatsParams) error
 
 	// Public Translations (companion website)
 	UpsertPublicTranslation(ctx context.Context, arg UpsertPublicTranslationParams) (PublicTranslation, error)

@@ -1,5 +1,5 @@
-// Seed script for the companion website. Populates public_translations with
-// sample data so you can iterate on the frontend design.
+// Seed script for the companion website. Populates players and
+// public_translations with sample data for frontend design iteration.
 //
 // Usage:
 //
@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -70,6 +71,9 @@ var samples = []translation{
 	{"솔로킬장인", "Solo Kill Artisan", "Claims mastery of 1v1s", "korean", "KR"},
 }
 
+var ranks = []string{"IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"}
+var champions = []string{"Yasuo", "Jinx", "Lux", "Ahri", "Zed", "Lee Sin", "Thresh", "Ezreal", "Kai'Sa", "Vayne", "Teemo", "Darius", "Garen", "Morgana", "Blitzcrank", "Miss Fortune", "Ashe", "Viego", "Yone", "Akali"}
+
 func main() {
 	dsn := flag.String("database-url", "postgres://leagueofren:localdev123@localhost:5432/leagueofren?sslmode=disable", "PostgreSQL connection URL")
 	clear := flag.Bool("clear", false, "Clear all website tables before seeding")
@@ -88,35 +92,53 @@ func main() {
 
 	if *clear {
 		log.Println("Clearing website tables...")
-		pool.Exec(ctx, "TRUNCATE public_translations, votes, public_feedback CASCADE")
+		pool.Exec(ctx, "TRUNCATE public_translations, votes, public_feedback, players CASCADE")
 	}
 
-	ranks := []string{"IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"}
-
-	log.Printf("Seeding %d translations...", len(samples))
+	log.Printf("Seeding %d players + translations...", len(samples))
 	for _, s := range samples {
-		upvotes := rand.IntN(200)
-		downvotes := rand.IntN(30)
-		hoursAgo := rand.IntN(720) // up to 30 days
-		createdAt := time.Now().Add(-time.Duration(hoursAgo) * time.Hour)
 		rank := ranks[rand.IntN(len(ranks))]
 
+		// Pick 3 random champions
+		perm := rand.Perm(len(champions))
+		topChamps := []string{champions[perm[0]], champions[perm[1]], champions[perm[2]]}
+		champJSON, _ := json.Marshal(topChamps)
+
+		// Upsert player
 		_, err := pool.Exec(ctx, `
-			INSERT INTO public_translations (username, translation, explanation, language, region, riot_verified, rank, upvotes, downvotes, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			INSERT INTO players (username, region, rank, top_champions)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (username) DO UPDATE SET
+				rank = EXCLUDED.rank,
+				top_champions = EXCLUDED.top_champions,
+				last_updated = NOW()
+		`, s.Username, s.Region, rank, string(champJSON))
+		if err != nil {
+			log.Printf("  WARN player %s: %v", s.Username, err)
+			continue
+		}
+
+		// Upsert translation
+		upvotes := rand.IntN(200)
+		downvotes := rand.IntN(30)
+		hoursAgo := rand.IntN(720)
+		createdAt := time.Now().Add(-time.Duration(hoursAgo) * time.Hour)
+
+		_, err = pool.Exec(ctx, `
+			INSERT INTO public_translations (username, translation, explanation, language, player_username, riot_verified, upvotes, downvotes, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			ON CONFLICT (username) DO UPDATE SET
 				translation = EXCLUDED.translation,
 				explanation = EXCLUDED.explanation,
 				upvotes = EXCLUDED.upvotes,
 				downvotes = EXCLUDED.downvotes,
-				rank = EXCLUDED.rank,
 				created_at = EXCLUDED.created_at
-		`, s.Username, s.Translation, s.Explanation, s.Language, s.Region, rand.IntN(2) == 1, rank, upvotes, downvotes, createdAt)
+		`, s.Username, s.Translation, s.Explanation, s.Language, s.Username, rand.IntN(2) == 1, upvotes, downvotes, createdAt)
 		if err != nil {
-			log.Printf("  WARN: %s: %v", s.Username, err)
+			log.Printf("  WARN translation %s: %v", s.Username, err)
 			continue
 		}
-		fmt.Printf("  ✓ %s → %s (%+d, %s, %s ago)\n", s.Username, s.Translation, upvotes-downvotes, rank, time.Duration(hoursAgo)*time.Hour)
+		fmt.Printf("  ✓ %s → %s (%+d, %s, %v, %s ago)\n", s.Username, s.Translation, upvotes-downvotes, rank, topChamps, time.Duration(hoursAgo)*time.Hour)
 	}
 
 	var count int64

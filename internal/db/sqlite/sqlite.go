@@ -491,6 +491,24 @@ func (r *Repository) DeleteExpiredGameCache(ctx context.Context) error {
 	return err
 }
 
+// Player stubs (companion website is Postgres-only)
+
+func (r *Repository) UpsertPlayer(_ context.Context, _ db.UpsertPlayerParams) (db.Player, error) {
+	return db.Player{}, fmt.Errorf("players not supported in SQLite mode")
+}
+
+func (r *Repository) GetPlayer(_ context.Context, _ string) (db.Player, error) {
+	return db.Player{}, fmt.Errorf("players not supported in SQLite mode")
+}
+
+func (r *Repository) ListAllPlayers(_ context.Context) ([]db.Player, error) {
+	return nil, fmt.Errorf("players not supported in SQLite mode")
+}
+
+func (r *Repository) UpdatePlayerStats(_ context.Context, _ db.UpdatePlayerStatsParams) error {
+	return fmt.Errorf("players not supported in SQLite mode")
+}
+
 // Public Translation stubs (companion website is Postgres-only)
 
 func (r *Repository) UpsertPublicTranslation(_ context.Context, _ db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {

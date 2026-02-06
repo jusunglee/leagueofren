@@ -73,9 +73,11 @@ func (q *Queries) CountPublicFeedback(ctx context.Context) (int64, error) {
 }
 
 const countPublicTranslations = `-- name: CountPublicTranslations :one
-SELECT COUNT(*) FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2)
+SELECT COUNT(*)
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2)
 `
 
 type CountPublicTranslationsParams struct {
@@ -567,13 +569,53 @@ func (q *Queries) GetLatestEvalForSubscription(ctx context.Context, subscription
 	return i, err
 }
 
-const getPublicTranslation = `-- name: GetPublicTranslation :one
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations WHERE id = $1
+const getPlayer = `-- name: GetPlayer :one
+SELECT username, region, rank, top_champions, puuid, first_seen, last_updated FROM players WHERE username = $1
 `
 
-func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTranslation, error) {
+func (q *Queries) GetPlayer(ctx context.Context, username string) (Player, error) {
+	row := q.db.QueryRow(ctx, getPlayer, username)
+	var i Player
+	err := row.Scan(
+		&i.Username,
+		&i.Region,
+		&i.Rank,
+		&i.TopChampions,
+		&i.Puuid,
+		&i.FirstSeen,
+		&i.LastUpdated,
+	)
+	return i, err
+}
+
+const getPublicTranslation = `-- name: GetPublicTranslation :one
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE pt.id = $1
+`
+
+type GetPublicTranslationRow struct {
+	ID           int64              `json:"id"`
+	Username     string             `json:"username"`
+	Translation  string             `json:"translation"`
+	Explanation  pgtype.Text        `json:"explanation"`
+	Language     string             `json:"language"`
+	Region       string             `json:"region"`
+	SourceBotID  pgtype.Text        `json:"source_bot_id"`
+	RiotVerified bool               `json:"riot_verified"`
+	Rank         pgtype.Text        `json:"rank"`
+	TopChampions pgtype.Text        `json:"top_champions"`
+	Upvotes      int32              `json:"upvotes"`
+	Downvotes    int32              `json:"downvotes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (GetPublicTranslationRow, error) {
 	row := q.db.QueryRow(ctx, getPublicTranslation, id)
-	var i PublicTranslation
+	var i GetPublicTranslationRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
@@ -584,6 +626,7 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTra
 		&i.SourceBotID,
 		&i.RiotVerified,
 		&i.Rank,
+		&i.TopChampions,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
@@ -592,12 +635,33 @@ func (q *Queries) GetPublicTranslation(ctx context.Context, id int64) (PublicTra
 }
 
 const getPublicTranslationByUsername = `-- name: GetPublicTranslationByUsername :one
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations WHERE username = $1
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE pt.username = $1
 `
 
-func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username string) (PublicTranslation, error) {
+type GetPublicTranslationByUsernameRow struct {
+	ID           int64              `json:"id"`
+	Username     string             `json:"username"`
+	Translation  string             `json:"translation"`
+	Explanation  pgtype.Text        `json:"explanation"`
+	Language     string             `json:"language"`
+	Region       string             `json:"region"`
+	SourceBotID  pgtype.Text        `json:"source_bot_id"`
+	RiotVerified bool               `json:"riot_verified"`
+	Rank         pgtype.Text        `json:"rank"`
+	TopChampions pgtype.Text        `json:"top_champions"`
+	Upvotes      int32              `json:"upvotes"`
+	Downvotes    int32              `json:"downvotes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username string) (GetPublicTranslationByUsernameRow, error) {
 	row := q.db.QueryRow(ctx, getPublicTranslationByUsername, username)
-	var i PublicTranslation
+	var i GetPublicTranslationByUsernameRow
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
@@ -608,6 +672,7 @@ func (q *Queries) GetPublicTranslationByUsername(ctx context.Context, username s
 		&i.SourceBotID,
 		&i.RiotVerified,
 		&i.Rank,
+		&i.TopChampions,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,
@@ -794,6 +859,38 @@ func (q *Queries) IncrementUpvotes(ctx context.Context, id int64) error {
 	return err
 }
 
+const listAllPlayers = `-- name: ListAllPlayers :many
+SELECT username, region, rank, top_champions, puuid, first_seen, last_updated FROM players ORDER BY username
+`
+
+func (q *Queries) ListAllPlayers(ctx context.Context) ([]Player, error) {
+	rows, err := q.db.Query(ctx, listAllPlayers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Player{}
+	for rows.Next() {
+		var i Player
+		if err := rows.Scan(
+			&i.Username,
+			&i.Region,
+			&i.Rank,
+			&i.TopChampions,
+			&i.Puuid,
+			&i.FirstSeen,
+			&i.LastUpdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicFeedback = `-- name: ListPublicFeedback :many
 SELECT pf.id, pf.translation_id, pf.ip_hash, pf.feedback_text, pf.created_at, pt.username, pt.translation
 FROM public_feedback pf
@@ -846,10 +943,14 @@ func (q *Queries) ListPublicFeedback(ctx context.Context, arg ListPublicFeedback
 }
 
 const listPublicTranslationsNew = `-- name: ListPublicTranslationsNew :many
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2)
-ORDER BY created_at DESC
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2)
+ORDER BY pt.created_at DESC
 LIMIT $3 OFFSET $4
 `
 
@@ -860,7 +961,23 @@ type ListPublicTranslationsNewParams struct {
 	Offset  int32  `json:"offset"`
 }
 
-func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicTranslationsNewParams) ([]PublicTranslation, error) {
+type ListPublicTranslationsNewRow struct {
+	ID           int64              `json:"id"`
+	Username     string             `json:"username"`
+	Translation  string             `json:"translation"`
+	Explanation  pgtype.Text        `json:"explanation"`
+	Language     string             `json:"language"`
+	Region       string             `json:"region"`
+	SourceBotID  pgtype.Text        `json:"source_bot_id"`
+	RiotVerified bool               `json:"riot_verified"`
+	Rank         pgtype.Text        `json:"rank"`
+	TopChampions pgtype.Text        `json:"top_champions"`
+	Upvotes      int32              `json:"upvotes"`
+	Downvotes    int32              `json:"downvotes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicTranslationsNewParams) ([]ListPublicTranslationsNewRow, error) {
 	rows, err := q.db.Query(ctx, listPublicTranslationsNew,
 		arg.Column1,
 		arg.Column2,
@@ -871,9 +988,9 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PublicTranslation{}
+	items := []ListPublicTranslationsNewRow{}
 	for rows.Next() {
-		var i PublicTranslation
+		var i ListPublicTranslationsNewRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Username,
@@ -884,6 +1001,7 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 			&i.SourceBotID,
 			&i.RiotVerified,
 			&i.Rank,
+			&i.TopChampions,
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
@@ -899,11 +1017,15 @@ func (q *Queries) ListPublicTranslationsNew(ctx context.Context, arg ListPublicT
 }
 
 const listPublicTranslationsTop = `-- name: ListPublicTranslationsTop :many
-SELECT id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at FROM public_translations
-WHERE ($1::text = '' OR region = $1)
-  AND ($2::text = '' OR language = $2)
-  AND created_at > $5
-ORDER BY (upvotes - downvotes) DESC, created_at DESC
+SELECT pt.id, pt.username, pt.translation, pt.explanation, pt.language,
+       p.region, pt.source_bot_id, pt.riot_verified, p.rank, p.top_champions,
+       pt.upvotes, pt.downvotes, pt.created_at
+FROM public_translations pt
+JOIN players p ON pt.player_username = p.username
+WHERE ($1::text = '' OR p.region = $1)
+  AND ($2::text = '' OR pt.language = $2)
+  AND pt.created_at > $5
+ORDER BY (pt.upvotes - pt.downvotes) DESC, pt.created_at DESC
 LIMIT $3 OFFSET $4
 `
 
@@ -915,7 +1037,23 @@ type ListPublicTranslationsTopParams struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicTranslationsTopParams) ([]PublicTranslation, error) {
+type ListPublicTranslationsTopRow struct {
+	ID           int64              `json:"id"`
+	Username     string             `json:"username"`
+	Translation  string             `json:"translation"`
+	Explanation  pgtype.Text        `json:"explanation"`
+	Language     string             `json:"language"`
+	Region       string             `json:"region"`
+	SourceBotID  pgtype.Text        `json:"source_bot_id"`
+	RiotVerified bool               `json:"riot_verified"`
+	Rank         pgtype.Text        `json:"rank"`
+	TopChampions pgtype.Text        `json:"top_champions"`
+	Upvotes      int32              `json:"upvotes"`
+	Downvotes    int32              `json:"downvotes"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicTranslationsTopParams) ([]ListPublicTranslationsTopRow, error) {
 	rows, err := q.db.Query(ctx, listPublicTranslationsTop,
 		arg.Column1,
 		arg.Column2,
@@ -927,9 +1065,9 @@ func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicT
 		return nil, err
 	}
 	defer rows.Close()
-	items := []PublicTranslation{}
+	items := []ListPublicTranslationsTopRow{}
 	for rows.Next() {
-		var i PublicTranslation
+		var i ListPublicTranslationsTopRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Username,
@@ -940,6 +1078,7 @@ func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicT
 			&i.SourceBotID,
 			&i.RiotVerified,
 			&i.Rank,
+			&i.TopChampions,
 			&i.Upvotes,
 			&i.Downvotes,
 			&i.CreatedAt,
@@ -954,6 +1093,22 @@ func (q *Queries) ListPublicTranslationsTop(ctx context.Context, arg ListPublicT
 	return items, nil
 }
 
+const updatePlayerStats = `-- name: UpdatePlayerStats :exec
+UPDATE players SET rank = $2, top_champions = $3, last_updated = NOW()
+WHERE username = $1
+`
+
+type UpdatePlayerStatsParams struct {
+	Username     string      `json:"username"`
+	Rank         pgtype.Text `json:"rank"`
+	TopChampions pgtype.Text `json:"top_champions"`
+}
+
+func (q *Queries) UpdatePlayerStats(ctx context.Context, arg UpdatePlayerStatsParams) error {
+	_, err := q.db.Exec(ctx, updatePlayerStats, arg.Username, arg.Rank, arg.TopChampions)
+	return err
+}
+
 const updateSubscriptionLastEvaluatedAt = `-- name: UpdateSubscriptionLastEvaluatedAt :exec
 UPDATE subscriptions
 SET last_evaluated_at = NOW()
@@ -965,45 +1120,87 @@ func (q *Queries) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int6
 	return err
 }
 
-const upsertPublicTranslation = `-- name: UpsertPublicTranslation :one
+const upsertPlayer = `-- name: UpsertPlayer :one
 
-INSERT INTO public_translations (username, translation, explanation, language, region, source_bot_id, riot_verified, rank)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+
+INSERT INTO players (username, region, rank, top_champions, puuid)
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (username) DO UPDATE SET
-    translation = EXCLUDED.translation,
-    explanation = EXCLUDED.explanation,
-    language = EXCLUDED.language,
     region = EXCLUDED.region,
-    source_bot_id = EXCLUDED.source_bot_id,
-    riot_verified = EXCLUDED.riot_verified,
-    rank = EXCLUDED.rank
-RETURNING id, username, translation, explanation, language, region, source_bot_id, riot_verified, rank, upvotes, downvotes, created_at
+    rank = COALESCE(EXCLUDED.rank, players.rank),
+    top_champions = COALESCE(EXCLUDED.top_champions, players.top_champions),
+    puuid = COALESCE(EXCLUDED.puuid, players.puuid),
+    last_updated = NOW()
+RETURNING username, region, rank, top_champions, puuid, first_seen, last_updated
 `
 
-type UpsertPublicTranslationParams struct {
+type UpsertPlayerParams struct {
 	Username     string      `json:"username"`
-	Translation  string      `json:"translation"`
-	Explanation  pgtype.Text `json:"explanation"`
-	Language     string      `json:"language"`
 	Region       string      `json:"region"`
-	SourceBotID  pgtype.Text `json:"source_bot_id"`
-	RiotVerified bool        `json:"riot_verified"`
 	Rank         pgtype.Text `json:"rank"`
+	TopChampions pgtype.Text `json:"top_champions"`
+	Puuid        pgtype.Text `json:"puuid"`
 }
 
 // ===========================================
 // Companion Website Queries
 // ===========================================
+// Player queries
+func (q *Queries) UpsertPlayer(ctx context.Context, arg UpsertPlayerParams) (Player, error) {
+	row := q.db.QueryRow(ctx, upsertPlayer,
+		arg.Username,
+		arg.Region,
+		arg.Rank,
+		arg.TopChampions,
+		arg.Puuid,
+	)
+	var i Player
+	err := row.Scan(
+		&i.Username,
+		&i.Region,
+		&i.Rank,
+		&i.TopChampions,
+		&i.Puuid,
+		&i.FirstSeen,
+		&i.LastUpdated,
+	)
+	return i, err
+}
+
+const upsertPublicTranslation = `-- name: UpsertPublicTranslation :one
+
+INSERT INTO public_translations (username, translation, explanation, language, player_username, source_bot_id, riot_verified)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (username) DO UPDATE SET
+    translation = EXCLUDED.translation,
+    explanation = EXCLUDED.explanation,
+    language = EXCLUDED.language,
+    player_username = EXCLUDED.player_username,
+    source_bot_id = EXCLUDED.source_bot_id,
+    riot_verified = EXCLUDED.riot_verified
+RETURNING id, username, translation, explanation, language, player_username, source_bot_id, riot_verified, upvotes, downvotes, created_at
+`
+
+type UpsertPublicTranslationParams struct {
+	Username       string      `json:"username"`
+	Translation    string      `json:"translation"`
+	Explanation    pgtype.Text `json:"explanation"`
+	Language       string      `json:"language"`
+	PlayerUsername string      `json:"player_username"`
+	SourceBotID    pgtype.Text `json:"source_bot_id"`
+	RiotVerified   bool        `json:"riot_verified"`
+}
+
+// Public translation queries (JOIN against players for region/rank/top_champions)
 func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicTranslationParams) (PublicTranslation, error) {
 	row := q.db.QueryRow(ctx, upsertPublicTranslation,
 		arg.Username,
 		arg.Translation,
 		arg.Explanation,
 		arg.Language,
-		arg.Region,
+		arg.PlayerUsername,
 		arg.SourceBotID,
 		arg.RiotVerified,
-		arg.Rank,
 	)
 	var i PublicTranslation
 	err := row.Scan(
@@ -1012,10 +1209,9 @@ func (q *Queries) UpsertPublicTranslation(ctx context.Context, arg UpsertPublicT
 		&i.Translation,
 		&i.Explanation,
 		&i.Language,
-		&i.Region,
+		&i.PlayerUsername,
 		&i.SourceBotID,
 		&i.RiotVerified,
-		&i.Rank,
 		&i.Upvotes,
 		&i.Downvotes,
 		&i.CreatedAt,

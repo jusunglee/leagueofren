@@ -231,6 +231,26 @@ func (m *MockRepository) DeleteExpiredGameCache(ctx context.Context) error {
 	return ret.Error(0)
 }
 
+func (m *MockRepository) UpsertPlayer(ctx context.Context, arg db.UpsertPlayerParams) (db.Player, error) {
+	ret := m.Called(ctx, arg)
+	return ret.Get(0).(db.Player), ret.Error(1)
+}
+
+func (m *MockRepository) GetPlayer(ctx context.Context, username string) (db.Player, error) {
+	ret := m.Called(ctx, username)
+	return ret.Get(0).(db.Player), ret.Error(1)
+}
+
+func (m *MockRepository) ListAllPlayers(ctx context.Context) ([]db.Player, error) {
+	ret := m.Called(ctx)
+	return ret.Get(0).([]db.Player), ret.Error(1)
+}
+
+func (m *MockRepository) UpdatePlayerStats(ctx context.Context, arg db.UpdatePlayerStatsParams) error {
+	ret := m.Called(ctx, arg)
+	return ret.Error(0)
+}
+
 func (m *MockRepository) UpsertPublicTranslation(ctx context.Context, arg db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {
 	ret := m.Called(ctx, arg)
 	return ret.Get(0).(db.PublicTranslation), ret.Error(1)
