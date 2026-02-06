@@ -18,6 +18,9 @@ translate-test
 # Go workspace file
 go.work
 
+.claude
+CLAUDE.local.md
+
 # Environment variables
 .env
 
