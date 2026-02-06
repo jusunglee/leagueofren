@@ -23,8 +23,8 @@ const REGIONS = ['NA', 'EUW', 'EUNE', 'KR', 'JP', 'BR', 'LAN', 'LAS', 'OCE', 'TR
 const LANGUAGES = ['korean', 'chinese']
 
 const BADGE_COLORS = [
-  'var(--primary)', 'var(--secondary)', 'var(--accent)',
-  'var(--sky)', 'var(--lavender)',
+  'var(--primary)', 'var(--violet)', 'var(--accent)',
+  'var(--sky)', 'var(--lavender)', 'var(--secondary)',
 ]
 
 function RankBadge({ index }: { index: number }) {
@@ -50,12 +50,12 @@ function TranslationCard({ t, index, onVote }: {
 
   return (
     <div
-      className={`relative pixel-border bg-[var(--card)] p-4 md:p-6 flex items-center gap-4 transition-all duration-200 animate-fade-in ${
+      className={`relative pixel-border bg-[var(--card)] p-4 lg:p-5 flex items-center gap-4 transition-all duration-200 animate-fade-in ${
         isTop3
-          ? 'pixel-border-double bg-[var(--background-alt)] shadow-[6px_6px_0px_0px_var(--accent)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_0px_var(--accent)]'
+          ? 'pixel-border-double bg-[var(--background-alt)] shadow-[6px_6px_0px_0px_var(--violet)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[8px_8px_0px_0px_var(--violet)]'
           : 'pixel-shadow-md hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)]'
       }`}
-      style={{ animationDelay: `${index * 50}ms` }}
+      style={{ animationDelay: `${index * 40}ms` }}
     >
       <RankBadge index={index} />
 
@@ -66,7 +66,7 @@ function TranslationCard({ t, index, onVote }: {
           className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--secondary)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           aria-label="Upvote"
         >
-          <ChevronUp size={24} strokeWidth={3} className="text-[var(--foreground)]" />
+          <ChevronUp size={24} strokeWidth={3} />
         </button>
         <span className={`pixel-font text-sm leading-none py-1 ${
           score > 0 ? 'text-[var(--secondary)]' : score < 0 ? 'text-[var(--destructive)]' : 'text-[var(--foreground-muted)]'
@@ -78,16 +78,16 @@ function TranslationCard({ t, index, onVote }: {
           className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--destructive)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
           aria-label="Downvote"
         >
-          <ChevronDown size={24} strokeWidth={3} className="text-[var(--foreground)]" />
+          <ChevronDown size={24} strokeWidth={3} />
         </button>
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="pixel-font text-base md:text-lg text-[var(--primary)] tracking-wide">{t.username}</span>
-          <span className="text-[var(--border-light)] font-bold">&rarr;</span>
-          <span className="font-bold text-base md:text-lg">{t.translation}</span>
+          <span className="pixel-font text-base lg:text-lg text-[var(--primary)] tracking-wide">{t.username}</span>
+          <span className="text-[var(--border)] font-bold">&rarr;</span>
+          <span className="font-bold text-base lg:text-lg">{t.translation}</span>
         </div>
         {t.explanation && (
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
@@ -143,55 +143,58 @@ export function Leaderboard() {
   const totalPages = data ? Math.ceil(data.pagination.total / 25) : 0
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <SectionMarker label="Rankings" />
 
-      {/* Sort Tabs */}
-      <div className="flex gap-3">
+      {/* Controls row — all inline on desktop */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Sort Tabs */}
         {SORT_OPTIONS.map(opt => {
           const Icon = opt.icon
           return (
             <button
               key={opt.value}
               onClick={() => { setSort(opt.value); setPage(1) }}
-              className={`pixel-font text-xs md:text-sm px-4 md:px-6 py-2 md:py-3 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
+              className={`pixel-font text-xs px-4 lg:px-5 py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
                 sort === opt.value
-                  ? 'bg-[var(--primary)] text-white pixel-shadow-sm'
+                  ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
                   : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
               }`}
             >
-              <Icon size={16} strokeWidth={2.5} />
-              <span className="hidden sm:inline">{opt.label}</span>
+              <Icon size={14} strokeWidth={2.5} />
+              {opt.label}
             </button>
           )
         })}
-      </div>
 
-      {/* Period selector (top sort only) */}
-      {sort === 'top' && (
-        <div className="flex gap-2 flex-wrap">
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => { setPeriod(opt.value); setPage(1) }}
-              className={`text-xs px-3 py-1.5 border-2 border-[var(--border)] rounded-[4px] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
-                period === opt.value
-                  ? 'bg-[var(--accent)] font-bold border-[var(--border)] pixel-shadow-sm'
-                  : 'bg-[var(--card)] hover:bg-[var(--muted)]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+        {/* Period (inline, shown when top) */}
+        {sort === 'top' && (
+          <>
+            <div className="w-px h-6 bg-[var(--border-light)]" />
+            {PERIOD_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => { setPeriod(opt.value); setPage(1) }}
+                className={`text-xs px-3 py-1.5 border-2 border-[var(--border)] rounded-[4px] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+                  period === opt.value
+                    ? 'bg-[var(--accent)] text-[var(--background)] font-bold pixel-shadow-sm'
+                    : 'bg-[var(--card)] hover:bg-[var(--muted)]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </>
+        )}
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Filters (right-aligned on desktop) */}
         <select
           value={region}
           onChange={e => { setRegion(e.target.value); setPage(1) }}
-          className="pixel-border bg-[var(--card)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:shadow-[inset_0_0_0_2px_rgba(232,93,117,0.15)] focus:outline-none"
+          className="pixel-border bg-[var(--card)] px-3 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
         >
           <option value="">All Regions</option>
           {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -199,7 +202,7 @@ export function Leaderboard() {
         <select
           value={language}
           onChange={e => { setLanguage(e.target.value); setPage(1) }}
-          className="pixel-border bg-[var(--card)] px-4 py-2 text-sm focus:border-[var(--primary)] focus:shadow-[inset_0_0_0_2px_rgba(232,93,117,0.15)] focus:outline-none"
+          className="pixel-border bg-[var(--card)] px-3 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
         >
           <option value="">All Languages</option>
           {LANGUAGES.map(l => <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
@@ -209,7 +212,7 @@ export function Leaderboard() {
             onClick={() => { setRegion(''); setLanguage(''); setPage(1) }}
             className="text-xs px-3 py-1.5 border-2 border-dashed border-[var(--border-light)] rounded-[4px] text-[var(--foreground-muted)] hover:border-solid hover:bg-[var(--muted)] transition-all"
           >
-            Clear filters
+            Clear
           </button>
         )}
       </div>
@@ -220,7 +223,7 @@ export function Leaderboard() {
           <p className="pixel-font text-sm text-[var(--foreground-muted)] tracking-wide">Loading translations...</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {data?.data.map((t, i) => (
             <TranslationCard
               key={t.id}
@@ -231,7 +234,7 @@ export function Leaderboard() {
           ))}
 
           {data?.data.length === 0 && (
-            <div className="pixel-border-double bg-[var(--background-alt)] pixel-shadow-accent p-8 md:p-12 text-center">
+            <div className="pixel-border-double bg-[var(--background-alt)] pixel-shadow-violet p-8 lg:p-12 text-center">
               <p className="pixel-font text-sm text-[var(--foreground-muted)] mb-2">No translations found!</p>
               <p className="text-sm text-[var(--foreground-muted)]">Try adjusting your filters or check back later.</p>
             </div>
