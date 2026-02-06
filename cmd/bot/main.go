@@ -19,6 +19,7 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db/postgres"
 	"github.com/jusunglee/leagueofren/internal/db/sqlite"
 	"github.com/jusunglee/leagueofren/internal/google"
+	"github.com/jusunglee/leagueofren/internal/health"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
@@ -73,6 +74,7 @@ func mainE() error {
 		evalExpirationDuration       = fs.DurationLong("eval-expiration-duration", 504*time.Hour, "Duration before evals expire (default 3 weeks)")
 		offlineActivityThreshold     = fs.DurationLong("offline-activity-threshold", 168*time.Hour, "Duration of inactivity before auto-unsubscribe (default 1 week)")
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
+		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -159,6 +161,15 @@ func mainE() error {
 			GuildID:                      *guildID,
 		},
 	)
+
+	healthServer := health.New(int(*healthPort))
+	go func() {
+		if err := healthServer.Start(); err != nil {
+			log.Error("health server error", "error", err)
+		}
+	}()
+	defer healthServer.Shutdown(context.Background())
+	log.InfoContext(ctx, "health server started", "port", *healthPort)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
