@@ -369,29 +369,18 @@ export function Leaderboard() {
           )
         })}
 
-        {sort === 'top' && (
-          <>
-            <div className="w-px h-6 bg-[var(--border-light)]" />
-            {PERIOD_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => { setPeriod(opt.value); setPage(1) }}
-                className={`text-xs px-3 py-1.5 border-2 border-[var(--border)] rounded-[4px] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
-                  period === opt.value
-                    ? 'bg-[var(--accent)] text-[var(--background)] font-bold pixel-shadow-sm'
-                    : 'bg-[var(--card)] hover:bg-[var(--muted)]'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </>
-        )}
-
         <div className="flex-1" />
 
         {/* Filters — custom pixel dropdowns */}
         <div className="flex items-center gap-3">
+          {sort === 'top' && (
+            <PixelDropdown
+              options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
+              value={period}
+              onChange={v => { setPeriod(v as PeriodOption); setPage(1) }}
+              placeholder="Period"
+            />
+          )}
           <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
           <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
           <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
