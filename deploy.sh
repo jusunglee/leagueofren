@@ -22,13 +22,16 @@ fi
 
 # Clone or update repo
 INSTALL_DIR="/opt/leagueofren"
+BRANCH="feat/companion-website"
 if [ -d "$INSTALL_DIR" ]; then
     echo "✓ Repo exists at $INSTALL_DIR, pulling latest..."
-    git -C "$INSTALL_DIR" pull
+    git -C "$INSTALL_DIR" fetch origin
+    git -C "$INSTALL_DIR" checkout "$BRANCH"
+    git -C "$INSTALL_DIR" pull origin "$BRANCH"
 else
     echo "Cloning repo..."
-    git clone https://github.com/jusunglee/leagueofren.git "$INSTALL_DIR"
-    echo "✓ Cloned to $INSTALL_DIR"
+    git clone -b "$BRANCH" https://github.com/jusunglee/leagueofren.git "$INSTALL_DIR"
+    echo "✓ Cloned to $INSTALL_DIR ($BRANCH)"
 fi
 
 cd "$INSTALL_DIR"
