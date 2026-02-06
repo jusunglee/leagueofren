@@ -360,6 +360,178 @@ func (r *Repository) DeleteExpiredGameCache(ctx context.Context) error {
 	return r.queries.DeleteExpiredGameCache(ctx)
 }
 
+// Public Translation methods
+
+func (r *Repository) UpsertPublicTranslation(ctx context.Context, arg db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {
+	result, err := r.queries.UpsertPublicTranslation(ctx, sqlc.UpsertPublicTranslationParams{
+		Username:     arg.Username,
+		Translation:  arg.Translation,
+		Explanation:  toPgText(arg.Explanation),
+		Language:     arg.Language,
+		Region:       arg.Region,
+		SourceBotID:  toPgText(arg.SourceBotID),
+		RiotVerified: arg.RiotVerified,
+	})
+	if err != nil {
+		return db.PublicTranslation{}, err
+	}
+	return convertPublicTranslation(result), nil
+}
+
+func (r *Repository) GetPublicTranslation(ctx context.Context, id int64) (db.PublicTranslation, error) {
+	result, err := r.queries.GetPublicTranslation(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return db.PublicTranslation{}, db.ErrNoRows
+		}
+		return db.PublicTranslation{}, err
+	}
+	return convertPublicTranslation(result), nil
+}
+
+func (r *Repository) GetPublicTranslationByUsername(ctx context.Context, username string) (db.PublicTranslation, error) {
+	result, err := r.queries.GetPublicTranslationByUsername(ctx, username)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return db.PublicTranslation{}, db.ErrNoRows
+		}
+		return db.PublicTranslation{}, err
+	}
+	return convertPublicTranslation(result), nil
+}
+
+func (r *Repository) ListPublicTranslationsNew(ctx context.Context, arg db.ListPublicTranslationsNewParams) ([]db.PublicTranslation, error) {
+	results, err := r.queries.ListPublicTranslationsNew(ctx, sqlc.ListPublicTranslationsNewParams{
+		Column1: arg.Region,
+		Column2: arg.Language,
+		Limit:   arg.Limit,
+		Offset:  arg.Offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertPublicTranslations(results), nil
+}
+
+func (r *Repository) ListPublicTranslationsTop(ctx context.Context, arg db.ListPublicTranslationsTopParams) ([]db.PublicTranslation, error) {
+	results, err := r.queries.ListPublicTranslationsTop(ctx, sqlc.ListPublicTranslationsTopParams{
+		Column1:   arg.Region,
+		Column2:   arg.Language,
+		Limit:     arg.Limit,
+		Offset:    arg.Offset,
+		CreatedAt: pgtype.Timestamptz{Valid: true, Time: arg.CreatedAt},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertPublicTranslations(results), nil
+}
+
+func (r *Repository) CountPublicTranslations(ctx context.Context, arg db.CountPublicTranslationsParams) (int64, error) {
+	return r.queries.CountPublicTranslations(ctx, sqlc.CountPublicTranslationsParams{
+		Column1: arg.Region,
+		Column2: arg.Language,
+	})
+}
+
+func (r *Repository) IncrementUpvotes(ctx context.Context, id int64) error {
+	return r.queries.IncrementUpvotes(ctx, id)
+}
+
+func (r *Repository) DecrementUpvotes(ctx context.Context, id int64) error {
+	return r.queries.DecrementUpvotes(ctx, id)
+}
+
+func (r *Repository) IncrementDownvotes(ctx context.Context, id int64) error {
+	return r.queries.IncrementDownvotes(ctx, id)
+}
+
+func (r *Repository) DecrementDownvotes(ctx context.Context, id int64) error {
+	return r.queries.DecrementDownvotes(ctx, id)
+}
+
+// Vote methods
+
+func (r *Repository) UpsertVote(ctx context.Context, arg db.UpsertVoteParams) (db.Vote, error) {
+	result, err := r.queries.UpsertVote(ctx, sqlc.UpsertVoteParams{
+		TranslationID: arg.TranslationID,
+		IpHash:        arg.IpHash,
+		Vote:          arg.Vote,
+	})
+	if err != nil {
+		return db.Vote{}, err
+	}
+	return convertVote(result), nil
+}
+
+func (r *Repository) GetVote(ctx context.Context, arg db.GetVoteParams) (db.Vote, error) {
+	result, err := r.queries.GetVote(ctx, sqlc.GetVoteParams{
+		TranslationID: arg.TranslationID,
+		IpHash:        arg.IpHash,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return db.Vote{}, db.ErrNoRows
+		}
+		return db.Vote{}, err
+	}
+	return convertVote(result), nil
+}
+
+func (r *Repository) DeleteVote(ctx context.Context, arg db.DeleteVoteParams) (int64, error) {
+	return r.queries.DeleteVote(ctx, sqlc.DeleteVoteParams{
+		TranslationID: arg.TranslationID,
+		IpHash:        arg.IpHash,
+	})
+}
+
+// Public Feedback methods
+
+func (r *Repository) CreatePublicFeedback(ctx context.Context, arg db.CreatePublicFeedbackParams) (db.PublicFeedback, error) {
+	result, err := r.queries.CreatePublicFeedback(ctx, sqlc.CreatePublicFeedbackParams{
+		TranslationID: arg.TranslationID,
+		IpHash:        arg.IpHash,
+		FeedbackText:  arg.FeedbackText,
+	})
+	if err != nil {
+		return db.PublicFeedback{}, err
+	}
+	return db.PublicFeedback{
+		ID:            result.ID,
+		TranslationID: result.TranslationID,
+		IpHash:        result.IpHash,
+		FeedbackText:  result.FeedbackText,
+		CreatedAt:     result.CreatedAt.Time,
+	}, nil
+}
+
+func (r *Repository) ListPublicFeedback(ctx context.Context, arg db.ListPublicFeedbackParams) ([]db.ListPublicFeedbackRow, error) {
+	results, err := r.queries.ListPublicFeedback(ctx, sqlc.ListPublicFeedbackParams{
+		Limit:  arg.Limit,
+		Offset: arg.Offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]db.ListPublicFeedbackRow, len(results))
+	for i, r := range results {
+		rows[i] = db.ListPublicFeedbackRow{
+			ID:            r.ID,
+			TranslationID: r.TranslationID,
+			IpHash:        r.IpHash,
+			FeedbackText:  r.FeedbackText,
+			CreatedAt:     r.CreatedAt.Time,
+			Username:      r.Username,
+			Translation:   r.Translation,
+		}
+	}
+	return rows, nil
+}
+
+func (r *Repository) CountPublicFeedback(ctx context.Context) (int64, error) {
+	return r.queries.CountPublicFeedback(ctx)
+}
+
 // Type conversion helpers
 
 func convertSubscription(s sqlc.Subscription) db.Subscription {
@@ -410,6 +582,40 @@ func convertTranslations(translations []sqlc.Translation) []db.Translation {
 		result[i] = convertTranslation(t)
 	}
 	return result
+}
+
+func convertPublicTranslation(t sqlc.PublicTranslation) db.PublicTranslation {
+	return db.PublicTranslation{
+		ID:           t.ID,
+		Username:     t.Username,
+		Translation:  t.Translation,
+		Explanation:  fromPgText(t.Explanation),
+		Language:     t.Language,
+		Region:       t.Region,
+		SourceBotID:  fromPgText(t.SourceBotID),
+		RiotVerified: t.RiotVerified,
+		Upvotes:      t.Upvotes,
+		Downvotes:    t.Downvotes,
+		CreatedAt:    t.CreatedAt.Time,
+	}
+}
+
+func convertPublicTranslations(translations []sqlc.PublicTranslation) []db.PublicTranslation {
+	result := make([]db.PublicTranslation, len(translations))
+	for i, t := range translations {
+		result[i] = convertPublicTranslation(t)
+	}
+	return result
+}
+
+func convertVote(v sqlc.Vote) db.Vote {
+	return db.Vote{
+		ID:            v.ID,
+		TranslationID: v.TranslationID,
+		IpHash:        v.IpHash,
+		Vote:          v.Vote,
+		CreatedAt:     v.CreatedAt.Time,
+	}
 }
 
 func toPgInt8(n sql.NullInt64) pgtype.Int8 {
