@@ -94,18 +94,22 @@ const RANK_COLORS: Record<string, string> = {
   CHALLENGER: '#f4c542',
 }
 
-const RANK_EMOJI: Record<string, string> = {
-  IRON: '⚙️',
-  BRONZE: '🥉',
-  SILVER: '🥈',
-  GOLD: '🥇',
-  PLATINUM: '💎',
-  EMERALD: '💚',
-  DIAMOND: '♦️',
-  MASTER: '👑',
-  GRANDMASTER: '🔥',
-  CHALLENGER: '⚡',
+const RANK_EMBLEM_URL = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem'
+
+const RANK_ICON: Record<string, string> = {
+  IRON: `${RANK_EMBLEM_URL}/emblem-iron.png`,
+  BRONZE: `${RANK_EMBLEM_URL}/emblem-bronze.png`,
+  SILVER: `${RANK_EMBLEM_URL}/emblem-silver.png`,
+  GOLD: `${RANK_EMBLEM_URL}/emblem-gold.png`,
+  PLATINUM: `${RANK_EMBLEM_URL}/emblem-platinum.png`,
+  EMERALD: `${RANK_EMBLEM_URL}/emblem-emerald.png`,
+  DIAMOND: `${RANK_EMBLEM_URL}/emblem-diamond.png`,
+  MASTER: `${RANK_EMBLEM_URL}/emblem-master.png`,
+  GRANDMASTER: `${RANK_EMBLEM_URL}/emblem-grandmaster.png`,
+  CHALLENGER: `${RANK_EMBLEM_URL}/emblem-challenger.png`,
 }
+
+const ALL_RANKS = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER']
 
 function SortIcon({ type, filled, color }: { type: 'flame' | 'sparkles' | 'trophy'; filled: boolean; color: string }) {
   switch (type) {
@@ -207,13 +211,13 @@ function TranslationCard({ t, index, onVote }: {
             <span className="text-sm leading-none" aria-hidden="true">{LANGUAGE_EMOJI[t.language] || '🌐'}</span>
             {t.language}
           </span>
-          {/* Rank badge */}
+          {/* Rank badge with official emblem */}
           {rank && RANK_COLORS[rank] && (
             <span
               className="mono-font text-[10px] px-2 py-0.5 border-2 rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 font-bold text-white"
               style={{ background: RANK_COLORS[rank], borderColor: 'var(--border)' }}
             >
-              <span className="text-sm leading-none" aria-hidden="true">{RANK_EMOJI[rank]}</span>
+              {RANK_ICON[rank] && <img src={RANK_ICON[rank]} alt="" className="w-4 h-4 object-contain" aria-hidden="true" />}
               {rank}
             </span>
           )}
@@ -274,6 +278,7 @@ export function Leaderboard() {
   const [period, setPeriod] = useState<PeriodOption>('week')
   const [region, setRegion] = useState('')
   const [language, setLanguage] = useState('')
+  const [rank, setRank] = useState('')
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useQuery({
@@ -285,6 +290,10 @@ export function Leaderboard() {
     mutationFn: ({ id, direction }: { id: number; direction: 1 | -1 }) => vote(id, direction),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['translations'] }),
   })
+
+  const filteredData = rank && data?.data
+    ? data.data.filter(t => t.rank?.toUpperCase() === rank)
+    : data?.data
 
   const totalPages = data ? Math.ceil(data.pagination.total / 25) : 0
 
@@ -350,9 +359,17 @@ export function Leaderboard() {
             <option value="">All Languages</option>
             {LANGUAGES.map(l => <option key={l} value={l}>{LANGUAGE_EMOJI[l] || ''} {l.charAt(0).toUpperCase() + l.slice(1)}</option>)}
           </select>
-          {(region || language) && (
+          <select
+            value={rank}
+            onChange={e => { setRank(e.target.value); setPage(1) }}
+            className="pixel-border bg-[var(--card)] px-4 py-1.5 text-sm focus:border-[var(--violet)] focus:outline-none"
+          >
+            <option value="">All Ranks</option>
+            {ALL_RANKS.map(r => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
+          </select>
+          {(region || language || rank) && (
             <button
-              onClick={() => { setRegion(''); setLanguage(''); setPage(1) }}
+              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setPage(1) }}
               className="text-xs px-3 py-1.5 border-2 border-dashed border-[var(--border-light)] rounded-[4px] text-[var(--foreground-muted)] hover:border-solid hover:bg-[var(--muted)] transition-all"
             >
               Clear
@@ -368,7 +385,7 @@ export function Leaderboard() {
         </div>
       ) : (
         <div className="space-y-3">
-          {data?.data.map((t, i) => (
+          {filteredData?.map((t, i) => (
             <TranslationCard
               key={t.id}
               t={t}
@@ -377,7 +394,7 @@ export function Leaderboard() {
             />
           ))}
 
-          {data?.data.length === 0 && (
+          {(!filteredData || filteredData.length === 0) && !isLoading && (
             <div className="pixel-border-double bg-[var(--background-alt)] pixel-shadow-violet p-8 lg:p-12 text-center">
               <p className="pixel-font text-sm text-[var(--foreground-muted)] mb-2">No translations found!</p>
               <p className="text-sm text-[var(--foreground-muted)]">Try adjusting your filters or check back later.</p>
