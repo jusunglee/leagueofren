@@ -360,23 +360,80 @@ func (r *Repository) DeleteExpiredGameCache(ctx context.Context) error {
 	return r.queries.DeleteExpiredGameCache(ctx)
 }
 
+// Player methods
+
+func (r *Repository) UpsertPlayer(ctx context.Context, arg db.UpsertPlayerParams) (db.Player, error) {
+	result, err := r.queries.UpsertPlayer(ctx, sqlc.UpsertPlayerParams{
+		Username:     arg.Username,
+		Region:       arg.Region,
+		Rank:         toPgText(arg.Rank),
+		TopChampions: toPgText(arg.TopChampions),
+		Puuid:        toPgText(arg.Puuid),
+	})
+	if err != nil {
+		return db.Player{}, err
+	}
+	return convertPlayer(result), nil
+}
+
+func (r *Repository) GetPlayer(ctx context.Context, username string) (db.Player, error) {
+	result, err := r.queries.GetPlayer(ctx, username)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return db.Player{}, db.ErrNoRows
+		}
+		return db.Player{}, err
+	}
+	return convertPlayer(result), nil
+}
+
+func (r *Repository) ListAllPlayers(ctx context.Context) ([]db.Player, error) {
+	results, err := r.queries.ListAllPlayers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	players := make([]db.Player, len(results))
+	for i, p := range results {
+		players[i] = convertPlayer(p)
+	}
+	return players, nil
+}
+
+func (r *Repository) UpdatePlayerStats(ctx context.Context, arg db.UpdatePlayerStatsParams) error {
+	return r.queries.UpdatePlayerStats(ctx, sqlc.UpdatePlayerStatsParams{
+		Username:     arg.Username,
+		Rank:         toPgText(arg.Rank),
+		TopChampions: toPgText(arg.TopChampions),
+	})
+}
+
 // Public Translation methods
 
 func (r *Repository) UpsertPublicTranslation(ctx context.Context, arg db.UpsertPublicTranslationParams) (db.PublicTranslation, error) {
 	result, err := r.queries.UpsertPublicTranslation(ctx, sqlc.UpsertPublicTranslationParams{
-		Username:     arg.Username,
-		Translation:  arg.Translation,
-		Explanation:  toPgText(arg.Explanation),
-		Language:     arg.Language,
-		Region:       arg.Region,
-		SourceBotID:  toPgText(arg.SourceBotID),
-		RiotVerified: arg.RiotVerified,
-		Rank:         toPgText(arg.Rank),
+		Username:       arg.Username,
+		Translation:    arg.Translation,
+		Explanation:    toPgText(arg.Explanation),
+		Language:       arg.Language,
+		PlayerUsername: arg.PlayerUsername,
+		SourceBotID:    toPgText(arg.SourceBotID),
+		RiotVerified:   arg.RiotVerified,
 	})
 	if err != nil {
 		return db.PublicTranslation{}, err
 	}
-	return convertPublicTranslation(result), nil
+	return db.PublicTranslation{
+		ID:           result.ID,
+		Username:     result.Username,
+		Translation:  result.Translation,
+		Explanation:  fromPgText(result.Explanation),
+		Language:     result.Language,
+		SourceBotID:  fromPgText(result.SourceBotID),
+		RiotVerified: result.RiotVerified,
+		Upvotes:      result.Upvotes,
+		Downvotes:    result.Downvotes,
+		CreatedAt:    result.CreatedAt.Time,
+	}, nil
 }
 
 func (r *Repository) GetPublicTranslation(ctx context.Context, id int64) (db.PublicTranslation, error) {
@@ -387,7 +444,10 @@ func (r *Repository) GetPublicTranslation(ctx context.Context, id int64) (db.Pub
 		}
 		return db.PublicTranslation{}, err
 	}
-	return convertPublicTranslation(result), nil
+	return convertPublicTranslationRow(result.ID, result.Username, result.Translation,
+		result.Explanation, result.Language, result.Region, result.SourceBotID,
+		result.RiotVerified, result.Rank, result.TopChampions,
+		result.Upvotes, result.Downvotes, result.CreatedAt), nil
 }
 
 func (r *Repository) GetPublicTranslationByUsername(ctx context.Context, username string) (db.PublicTranslation, error) {
@@ -398,7 +458,10 @@ func (r *Repository) GetPublicTranslationByUsername(ctx context.Context, usernam
 		}
 		return db.PublicTranslation{}, err
 	}
-	return convertPublicTranslation(result), nil
+	return convertPublicTranslationRow(result.ID, result.Username, result.Translation,
+		result.Explanation, result.Language, result.Region, result.SourceBotID,
+		result.RiotVerified, result.Rank, result.TopChampions,
+		result.Upvotes, result.Downvotes, result.CreatedAt), nil
 }
 
 func (r *Repository) ListPublicTranslationsNew(ctx context.Context, arg db.ListPublicTranslationsNewParams) ([]db.PublicTranslation, error) {
@@ -411,7 +474,14 @@ func (r *Repository) ListPublicTranslationsNew(ctx context.Context, arg db.ListP
 	if err != nil {
 		return nil, err
 	}
-	return convertPublicTranslations(results), nil
+	out := make([]db.PublicTranslation, len(results))
+	for i, r := range results {
+		out[i] = convertPublicTranslationRow(r.ID, r.Username, r.Translation,
+			r.Explanation, r.Language, r.Region, r.SourceBotID,
+			r.RiotVerified, r.Rank, r.TopChampions,
+			r.Upvotes, r.Downvotes, r.CreatedAt)
+	}
+	return out, nil
 }
 
 func (r *Repository) ListPublicTranslationsTop(ctx context.Context, arg db.ListPublicTranslationsTopParams) ([]db.PublicTranslation, error) {
@@ -425,7 +495,14 @@ func (r *Repository) ListPublicTranslationsTop(ctx context.Context, arg db.ListP
 	if err != nil {
 		return nil, err
 	}
-	return convertPublicTranslations(results), nil
+	out := make([]db.PublicTranslation, len(results))
+	for i, r := range results {
+		out[i] = convertPublicTranslationRow(r.ID, r.Username, r.Translation,
+			r.Explanation, r.Language, r.Region, r.SourceBotID,
+			r.RiotVerified, r.Rank, r.TopChampions,
+			r.Upvotes, r.Downvotes, r.CreatedAt)
+	}
+	return out, nil
 }
 
 func (r *Repository) CountPublicTranslations(ctx context.Context, arg db.CountPublicTranslationsParams) (int64, error) {
@@ -585,29 +662,40 @@ func convertTranslations(translations []sqlc.Translation) []db.Translation {
 	return result
 }
 
-func convertPublicTranslation(t sqlc.PublicTranslation) db.PublicTranslation {
-	return db.PublicTranslation{
-		ID:           t.ID,
-		Username:     t.Username,
-		Translation:  t.Translation,
-		Explanation:  fromPgText(t.Explanation),
-		Language:     t.Language,
-		Region:       t.Region,
-		SourceBotID:  fromPgText(t.SourceBotID),
-		RiotVerified: t.RiotVerified,
-		Rank:         fromPgText(t.Rank),
-		Upvotes:      t.Upvotes,
-		Downvotes:    t.Downvotes,
-		CreatedAt:    t.CreatedAt.Time,
+func convertPlayer(p sqlc.Player) db.Player {
+	return db.Player{
+		Username:     p.Username,
+		Region:       p.Region,
+		Rank:         fromPgText(p.Rank),
+		TopChampions: fromPgText(p.TopChampions),
+		Puuid:        fromPgText(p.Puuid),
+		FirstSeen:    p.FirstSeen.Time,
+		LastUpdated:  p.LastUpdated.Time,
 	}
 }
 
-func convertPublicTranslations(translations []sqlc.PublicTranslation) []db.PublicTranslation {
-	result := make([]db.PublicTranslation, len(translations))
-	for i, t := range translations {
-		result[i] = convertPublicTranslation(t)
+func convertPublicTranslationRow(
+	id int64, username, translation string,
+	explanation pgtype.Text, language, region string,
+	sourceBotID pgtype.Text, riotVerified bool,
+	rank, topChampions pgtype.Text,
+	upvotes, downvotes int32, createdAt pgtype.Timestamptz,
+) db.PublicTranslation {
+	return db.PublicTranslation{
+		ID:           id,
+		Username:     username,
+		Translation:  translation,
+		Explanation:  fromPgText(explanation),
+		Language:     language,
+		Region:       region,
+		SourceBotID:  fromPgText(sourceBotID),
+		RiotVerified: riotVerified,
+		Rank:         fromPgText(rank),
+		TopChampions: fromPgText(topChampions),
+		Upvotes:      upvotes,
+		Downvotes:    downvotes,
+		CreatedAt:    createdAt.Time,
 	}
-	return result
 }
 
 func convertVote(v sqlc.Vote) db.Vote {

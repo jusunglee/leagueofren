@@ -183,6 +183,103 @@ func ParseRiotID(input string) (gameName, tagLine string, err error) {
 	return gameName, tagLine, nil
 }
 
+type LeagueEntry struct {
+	QueueType    string `json:"queueType"`
+	Tier         string `json:"tier"`
+	Rank         string `json:"rank"`
+	LeaguePoints int    `json:"leaguePoints"`
+}
+
+type ChampionMastery struct {
+	ChampionID     int64 `json:"championId"`
+	ChampionLevel  int   `json:"championLevel"`
+	ChampionPoints int64 `json:"championPoints"`
+}
+
+type DirectClient struct {
+	c *client
+}
+
+func NewDirectClient(apiKey string) *DirectClient {
+	return &DirectClient{c: newClient(apiKey)}
+}
+
+func (d *DirectClient) GetAccountByRiotID(gameName, tagLine, region string) (Account, error) {
+	return d.c.GetAccountByRiotID(gameName, tagLine, region)
+}
+
+func (d *DirectClient) GetRankedEntries(puuid, region string) ([]LeagueEntry, error) {
+	baseURL, err := getPlatformURL(region)
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("%s/lol/league/v4/entries/by-puuid/%s",
+		baseURL,
+		url.PathEscape(puuid),
+	)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("X-Riot-Token", d.c.apiKey)
+
+	resp, err := d.c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var entries []LeagueEntry
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return entries, nil
+}
+
+func (d *DirectClient) GetTopChampionMastery(puuid, region string, count int) ([]ChampionMastery, error) {
+	baseURL, err := getPlatformURL(region)
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("%s/lol/champion-mastery/v4/champion-masteries/by-puuid/%s/top?count=%d",
+		baseURL,
+		url.PathEscape(puuid),
+		count,
+	)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("X-Riot-Token", d.c.apiKey)
+
+	resp, err := d.c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var masteries []ChampionMastery
+	if err := json.NewDecoder(resp.Body).Decode(&masteries); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return masteries, nil
+}
+
 func (c *client) GetActiveGame(puuid, region string) (ActiveGame, error) {
 	baseURL, err := getPlatformURL(region)
 	if err != nil {

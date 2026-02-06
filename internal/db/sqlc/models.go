@@ -24,6 +24,16 @@ type Feedback struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type Player struct {
+	Username     string             `json:"username"`
+	Region       string             `json:"region"`
+	Rank         pgtype.Text        `json:"rank"`
+	TopChampions pgtype.Text        `json:"top_champions"`
+	Puuid        pgtype.Text        `json:"puuid"`
+	FirstSeen    pgtype.Timestamptz `json:"first_seen"`
+	LastUpdated  pgtype.Timestamptz `json:"last_updated"`
+}
+
 type PublicFeedback struct {
 	ID            int64              `json:"id"`
 	TranslationID int64              `json:"translation_id"`
@@ -33,18 +43,17 @@ type PublicFeedback struct {
 }
 
 type PublicTranslation struct {
-	ID           int64              `json:"id"`
-	Username     string             `json:"username"`
-	Translation  string             `json:"translation"`
-	Explanation  pgtype.Text        `json:"explanation"`
-	Language     string             `json:"language"`
-	Region       string             `json:"region"`
-	SourceBotID  pgtype.Text        `json:"source_bot_id"`
-	RiotVerified bool               `json:"riot_verified"`
-	Rank         pgtype.Text        `json:"rank"`
-	Upvotes      int32              `json:"upvotes"`
-	Downvotes    int32              `json:"downvotes"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID             int64              `json:"id"`
+	Username       string             `json:"username"`
+	Translation    string             `json:"translation"`
+	Explanation    pgtype.Text        `json:"explanation"`
+	Language       string             `json:"language"`
+	PlayerUsername string             `json:"player_username"`
+	SourceBotID    pgtype.Text        `json:"source_bot_id"`
+	RiotVerified   bool               `json:"riot_verified"`
+	Upvotes        int32              `json:"upvotes"`
+	Downvotes      int32              `json:"downvotes"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type RiotAccountCache struct {

@@ -284,6 +284,12 @@ function TranslationCard({ t, index, onVote }: {
               {rank}
             </span>
           )}
+          {t.top_champions && t.top_champions.length > 0 && (
+            <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] inline-flex items-center gap-1">
+              <span className="text-sm leading-none" aria-hidden="true">⚔️</span>
+              {t.top_champions.join(', ')}
+            </span>
+          )}
 
           <span className="hidden lg:inline w-px h-4 bg-[var(--border-light)]" />
 

@@ -22,18 +22,19 @@ func NewTranslationHandler(repo db.Repository, log *slog.Logger) *TranslationHan
 }
 
 type translationResponse struct {
-	ID           int64   `json:"id"`
-	Username     string  `json:"username"`
-	Translation  string  `json:"translation"`
-	Explanation  *string `json:"explanation,omitempty"`
-	Language     string  `json:"language"`
-	Region       string  `json:"region"`
-	RiotVerified bool    `json:"riot_verified"`
-	Rank         *string `json:"rank,omitempty"`
-	Upvotes      int32   `json:"upvotes"`
-	Downvotes    int32   `json:"downvotes"`
-	Score        float64 `json:"score,omitempty"`
-	CreatedAt    string  `json:"created_at"`
+	ID           int64    `json:"id"`
+	Username     string   `json:"username"`
+	Translation  string   `json:"translation"`
+	Explanation  *string  `json:"explanation,omitempty"`
+	Language     string   `json:"language"`
+	Region       string   `json:"region"`
+	RiotVerified bool     `json:"riot_verified"`
+	Rank         *string  `json:"rank,omitempty"`
+	TopChampions []string `json:"top_champions,omitempty"`
+	Upvotes      int32    `json:"upvotes"`
+	Downvotes    int32    `json:"downvotes"`
+	Score        float64  `json:"score,omitempty"`
+	CreatedAt    string   `json:"created_at"`
 }
 
 type paginationMeta struct {
@@ -64,6 +65,12 @@ func toTranslationResponse(t db.PublicTranslation) translationResponse {
 	}
 	if t.Rank.Valid {
 		resp.Rank = &t.Rank.String
+	}
+	if t.TopChampions.Valid && t.TopChampions.String != "" {
+		var champs []string
+		if err := json.Unmarshal([]byte(t.TopChampions.String), &champs); err == nil {
+			resp.TopChampions = champs
+		}
 	}
 	return resp
 }
@@ -248,28 +255,42 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := db.UpsertPublicTranslationParams{
-		Username:     req.Username,
-		Translation:  req.Translation,
-		Language:     req.Language,
-		Region:       req.Region,
-		RiotVerified: req.RiotVerified,
-	}
-	if req.Explanation != nil {
-		params.Explanation = sql.NullString{String: *req.Explanation, Valid: true}
-	}
-	if req.SourceBotID != nil {
-		params.SourceBotID = sql.NullString{String: *req.SourceBotID, Valid: true}
-	}
+	var result db.PublicTranslation
+	err := h.repo.WithTx(r.Context(), func(txRepo db.Repository) error {
+		_, err := txRepo.UpsertPlayer(r.Context(), db.UpsertPlayerParams{
+			Username: req.Username,
+			Region:   req.Region,
+		})
+		if err != nil {
+			return err
+		}
 
-	t, err := h.repo.UpsertPublicTranslation(r.Context(), params)
+		params := db.UpsertPublicTranslationParams{
+			Username:       req.Username,
+			Translation:    req.Translation,
+			Language:       req.Language,
+			PlayerUsername: req.Username,
+			RiotVerified:   req.RiotVerified,
+		}
+		if req.Explanation != nil {
+			params.Explanation = sql.NullString{String: *req.Explanation, Valid: true}
+		}
+		if req.SourceBotID != nil {
+			params.SourceBotID = sql.NullString{String: *req.SourceBotID, Valid: true}
+		}
+
+		result, err = txRepo.UpsertPublicTranslation(r.Context(), params)
+		return err
+	})
 	if err != nil {
 		h.log.ErrorContext(r.Context(), "upserting translation", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, toTranslationResponse(t))
+	result.Region = req.Region
+
+	writeJSON(w, http.StatusCreated, toTranslationResponse(result))
 }
 
 func periodCutoff(period string) time.Time {

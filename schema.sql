@@ -87,6 +87,19 @@ CREATE INDEX idx_riot_game_cache_expires ON riot_game_cache(expires_at);
 -- Companion Website Tables
 -- ===========================================
 
+-- Players table (player metadata, refreshed by worker)
+CREATE TABLE players (
+    username TEXT PRIMARY KEY,
+    region TEXT NOT NULL,
+    rank TEXT,
+    top_champions TEXT,
+    puuid TEXT,
+    first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_players_region ON players(region);
+
 -- Public translations submitted by bot users (opt-in)
 CREATE TABLE public_translations (
     id BIGSERIAL PRIMARY KEY,
@@ -94,10 +107,9 @@ CREATE TABLE public_translations (
     translation TEXT NOT NULL,
     explanation TEXT,
     language TEXT NOT NULL,
-    region TEXT NOT NULL,
+    player_username TEXT NOT NULL REFERENCES players(username),
     source_bot_id TEXT,
     riot_verified BOOLEAN NOT NULL DEFAULT false,
-    rank TEXT,
     upvotes INT NOT NULL DEFAULT 0,
     downvotes INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
