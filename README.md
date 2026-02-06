@@ -3,7 +3,7 @@
 <p>
     <a href="https://github.com/jusunglee/leagueofren/releases"><img src="https://img.shields.io/github/release/jusunglee/leagueofren.svg" alt="Latest Release"></a>
     <a href="https://pkg.go.dev/github.com/jusunglee/leagueofren"><img src="https://godoc.org/github.com/jusunglee/leagueofren?status.svg" alt="GoDoc"></a>
-    <a href="https://github.com/jusunglee/leagueofren/actions"><img src="https://github.com/jusunglee/leagueofren/actions/workflows/release.yml/badge.svg?branch=main" alt="Build Status"></a>
+    <a href="https://github.com/jusunglee/leagueofren/actions/workflows/ci.yml"><img src="https://github.com/jusunglee/leagueofren/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build Status"></a>
 </p>
 
 A Discord bot that translates Korean and Chinese summoner names in League of Legends games for subscribed users.
