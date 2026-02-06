@@ -78,6 +78,8 @@ func mainE() error {
 		numConsumers                 = fs.Int64Long("num-consumers", 2, "Number of consumer goroutines")
 		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
 		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
+		websiteURL                   = fs.StringLong("website-url", "", "Companion website URL for submitting translations (empty to disable)")
+		websiteAPIKey                = fs.StringLong("website-api-key", "", "API key for the companion website")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -165,6 +167,8 @@ func mainE() error {
 			NumConsumers:                 *numConsumers,
 			GuildID:                      *guildID,
 			JobBufferSize:                int(*jobBufferSize),
+			WebsiteURL:                   *websiteURL,
+			WebsiteAPIKey:                *websiteAPIKey,
 		},
 	)
 

@@ -29,6 +29,8 @@ type Config struct {
 	NumConsumers                 int64
 	GuildID                      string
 	JobBufferSize                int
+	WebsiteURL                   string
+	WebsiteAPIKey                string
 }
 
 type Bot struct {
@@ -40,6 +42,7 @@ type Bot struct {
 	translator    Translator
 	config        Config
 	rateLimiter   *RateLimiter
+	websiteClient *WebsiteClient
 }
 
 func New(
@@ -60,6 +63,7 @@ func New(
 		translator:    translator,
 		config:        config,
 		rateLimiter:   NewRateLimiter(),
+		websiteClient: NewWebsiteClient(config.WebsiteURL, config.WebsiteAPIKey),
 	}
 }
 
@@ -610,6 +614,7 @@ type sendMessageJob struct {
 	subscriptionID int64
 	channelID      string
 	gameID         int64
+	region         string
 }
 
 func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]sendMessageJob, error) {
@@ -685,6 +690,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 				channelID:      sub.DiscordChannelID,
 				subscriptionID: sub.ID,
 				gameID:         game.GameID,
+				region:         sub.Region,
 			})
 			return nil
 		})
@@ -744,6 +750,14 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		"game_id", job.gameID,
 	)
 
+	// Best-effort: submit translations to the companion website if configured
+	if b.websiteClient.Enabled() {
+		language := detectLanguage(job.translations)
+		if err := b.websiteClient.SubmitTranslations(ctx, job.translations, language, job.region); err != nil {
+			b.log.WarnContext(ctx, "failed to submit translations to website", "error", err)
+		}
+	}
+
 	return nil
 }
 
@@ -781,6 +795,17 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	}
 
 	return jobs, err
+}
+
+func detectLanguage(translations []translation.Translation) string {
+	for _, t := range translations {
+		for _, r := range t.Original {
+			if unicode.Is(unicode.Hangul, r) {
+				return "korean"
+			}
+		}
+	}
+	return "chinese"
 }
 
 // TODO: Only supports korean and chinese so far, make the language a user-passed flag.
