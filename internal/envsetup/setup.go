@@ -204,9 +204,10 @@ func (m model) writeEnvFile() error {
 }
 
 func sanitizeValue(s string) string {
-	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\x00", "")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.TrimSpace(s)
 	return s
 }
 
