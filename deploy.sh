@@ -85,12 +85,27 @@ echo "✓ Configuration saved to $INSTALL_DIR/.env.prod"
 echo "  (Postgres password auto-generated: $POSTGRES_PASSWORD)"
 echo ""
 
+# GHCR login (images are private)
+echo "─── Docker Registry ───"
+echo ""
+echo "The Docker images are hosted on GitHub Container Registry (private)."
+echo "You'll need a GitHub Personal Access Token (classic) with 'read:packages' scope."
+echo "  Create one at: https://github.com/settings/tokens/new"
+echo ""
+read -rp "GitHub username: " GH_USER
+read -rsp "GitHub token (read:packages): " GH_TOKEN
+echo ""
+echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+echo "✓ Logged into ghcr.io"
+echo ""
+
 # Deploy
 echo "─── Deploying ───"
 echo ""
 
 cd "$INSTALL_DIR"
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml pull
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
 
 echo ""
 echo "─── Done! ───"
@@ -109,5 +124,5 @@ echo "    docker compose --env-file .env.prod -f docker-compose.prod.yml restart
 echo "    docker compose --env-file .env.prod -f docker-compose.prod.yml down"
 echo ""
 echo "  Update:"
-echo "    cd $INSTALL_DIR && git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build"
+echo "    cd $INSTALL_DIR && git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d"
 echo ""

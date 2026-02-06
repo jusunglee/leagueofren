@@ -26,9 +26,7 @@ services:
       - web
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
+    image: ghcr.io/jusunglee/leagueofren/web:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -42,9 +40,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
+    image: ghcr.io/jusunglee/leagueofren/worker:latest
     restart: unless-stopped
     depends_on:
       postgres:
