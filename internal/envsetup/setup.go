@@ -189,15 +189,25 @@ func (m model) writeEnvFile() error {
 		llmKeyName = "GOOGLE_API_KEY"
 	}
 
-	content := fmt.Sprintf(`DATABASE_URL=./leagueofren.db
-DISCORD_TOKEN=%s
-RIOT_API_KEY=%s
-LLM_PROVIDER=%s
-LLM_MODEL=%s
-%s=%s
-`, m.discordToken, m.riotAPIKey, m.llmProvider, llmModel, llmKeyName, m.llmAPIKey)
+	lines := []string{
+		"DATABASE_URL=./leagueofren.db",
+		"DISCORD_TOKEN=" + sanitizeValue(m.discordToken),
+		"RIOT_API_KEY=" + sanitizeValue(m.riotAPIKey),
+		"LLM_PROVIDER=" + sanitizeValue(m.llmProvider),
+		"LLM_MODEL=" + llmModel,
+		llmKeyName + "=" + sanitizeValue(m.llmAPIKey),
+		"",
+	}
+	content := strings.Join(lines, "\r\n")
 
 	return os.WriteFile(".env", []byte(content), 0600)
+}
+
+func sanitizeValue(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\r", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	return s
 }
 
 func (m model) View() string {
