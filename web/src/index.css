@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FFF8F0;
+  --background-alt: #FEF3E2;
+  --foreground: #3B2D26;
+  --foreground-muted: #8B7355;
+  --primary: #E85D75;
+  --primary-hover: #D14A63;
+  --secondary: #5B8A72;
+  --secondary-hover: #4A7660;
+  --accent: #F2A65A;
+  --accent-bright: #FFD93D;
+  --sky: #7EC8E3;
+  --lavender: #B8A9D4;
+  --border: #3B2D26;
+  --border-light: #D4C4A8;
+  --card: #FFFDF8;
+  --muted: #F5EDE0;
+  --ring: #E85D75;
+  --destructive: #D4483B;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: "Nunito", "Quicksand", system-ui, sans-serif;
+  background-image: radial-gradient(circle, #3B2D2610 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.pixel-font {
+  font-family: "Silkscreen", "Press Start 2P", monospace;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+  text-rendering: optimizeSpeed;
+  image-rendering: pixelated;
+}
+
+.pixel-shadow-sm { box-shadow: 2px 2px 0px 0px var(--border); }
+.pixel-shadow-md { box-shadow: 4px 4px 0px 0px var(--border); }
+.pixel-shadow-lg { box-shadow: 6px 6px 0px 0px var(--border); }
+.pixel-shadow-xl { box-shadow: 8px 8px 0px 0px var(--border); }
+
+.pixel-border {
+  border: 4px solid var(--border);
+  border-radius: 8px;
+}
+
+@keyframes sparkle-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
+@keyframes bounce-cursor {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition-duration: 0.01ms !important; }
+}
