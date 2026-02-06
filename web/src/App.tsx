@@ -84,12 +84,11 @@ export default function App() {
                   <h3 className="pixel-font text-[10px] tracking-wide">On Submissions</h3>
                 </div>
                 <p className="text-xs text-[var(--foreground-muted)] leading-relaxed mb-3">
-                  Translations here are "captured" from real games — not mass-submitted.
-                  The bot is{' '}
+                  I think this is more fun if these translations are "captured" as part of games rather than just people mass submitting summoner names. The bot is{' '}
                   <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="text-[var(--violet)] underline hover:text-[var(--primary)] transition-colors">
                     open source
                   </a>
-                  {' '}and you can run it yourself, optionally having it submit translations to this site. Thanks for contributing!
+                  {' '}and you can run it yourself and optionally have it submit the translations to this site. Thanks for contributing!
                 </p>
               </div>
 
@@ -106,7 +105,7 @@ export default function App() {
                   Submit your own translations!
                 </p>
                 <a
-                  href={REPO_URL}
+                  href={`${REPO_URL}#quick-start`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pixel-font text-[10px] px-3 py-1.5 bg-[var(--violet)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[var(--violet-deep)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-2"
@@ -164,12 +163,11 @@ export default function App() {
                     <h3 className="pixel-font text-xs tracking-wide">On Submissions</h3>
                   </div>
                   <p className="text-sm text-[var(--foreground-muted)] leading-relaxed">
-                    Translations here are "captured" from real games — not mass-submitted.
-                    The bot is{' '}
+                    I think this is more fun if these translations are "captured" as part of games rather than just people mass submitting summoner names. The bot is{' '}
                     <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className="text-[var(--violet)] underline hover:text-[var(--primary)] transition-colors">
                       open source
                     </a>
-                    {' '}and you can run it yourself. Thanks for contributing!
+                    {' '}and you can run it yourself and optionally have it submit the translations to this site. Thanks for contributing!
                   </p>
                 </div>
               </div>
