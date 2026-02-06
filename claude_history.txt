@@ -449,3 +449,4 @@ what's the right command for claude mcp add-json github '{"type":"http","url":"h
 (followup) backtick escaping in powershell leads to "Invalid configuration: Invalid input" - need to use single quotes or string concatenation instead
 (followup) string concatenation with single quotes also fails - need backslash escaping for external commands on Windows
 Try option B and then option A. Checkout a branch before commit + pushing the tag, and use the github MCP for checking on the action
+Implement HIGH-1 Rate Limiting on User Commands: Create RateLimiter struct (max 5 commands per 60s per user), integrate into Bot struct and handleCommand.
