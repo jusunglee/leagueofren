@@ -47,6 +47,7 @@ type Translator interface {
 // MessageServer defines the interface for sending messages to a messaging platform
 type MessageServer interface {
 	SendMessage(ctx context.Context, job sendMessageJob) (*discordgo.Message, error)
+	ReplyToMessage(channelID, messageID, content string) error
 }
 
 // slogAdapter wraps *slog.Logger to return our Logger interface from With()
@@ -123,6 +124,14 @@ func (d *discordMessageServer) SendMessage(ctx context.Context, job sendMessageJ
 			},
 		},
 	})
+}
+
+func (d *discordMessageServer) ReplyToMessage(channelID, messageID, content string) error {
+	_, err := d.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Content:   content,
+		Reference: &discordgo.MessageReference{MessageID: messageID},
+	})
+	return err
 }
 
 // NewMessageServer creates a MessageServer that uses Discord

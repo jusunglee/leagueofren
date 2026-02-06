@@ -682,6 +682,15 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		return nil
 	})
 	if err != nil {
+		if replyErr := b.messageServer.ReplyToMessage(job.channelID, msg.ID,
+			"⚠️ Had an issue saving this result — you might see this translation again next check. Sorry!"); replyErr != nil {
+			b.log.WarnContext(ctx, "failed to reply to orphaned message after transaction failure",
+				"message_id", msg.ID,
+				"channel_id", job.channelID,
+				"reply_error", replyErr,
+				"original_error", err,
+			)
+		}
 		return err
 	}
 
