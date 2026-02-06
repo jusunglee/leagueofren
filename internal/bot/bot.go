@@ -30,7 +30,6 @@ type Config struct {
 	GuildID                      string
 	JobBufferSize                int
 	WebsiteURL                   string
-	WebsiteAPIKey                string
 }
 
 type Bot struct {
@@ -63,7 +62,7 @@ func New(
 		translator:    translator,
 		config:        config,
 		rateLimiter:   NewRateLimiter(),
-		websiteClient: NewWebsiteClient(config.WebsiteURL, config.WebsiteAPIKey),
+		websiteClient: NewWebsiteClient(config.WebsiteURL),
 	}
 }
 
