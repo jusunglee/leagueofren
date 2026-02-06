@@ -708,13 +708,13 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 
 	var eg errgroup.Group
 	var mu sync.Mutex
-	var jobs []sendMessageJob
+	allServerJobs := make([][]sendMessageJob, 0, len(servers))
 
 	for server, subs := range servers {
 		eg.Go(func() error {
 			serverJobs, err := b.produceForServer(ctx, subs)
 			mu.Lock()
-			jobs = append(jobs, serverJobs...)
+			allServerJobs = append(allServerJobs, serverJobs)
 			mu.Unlock()
 			// Best effort
 			if err != nil {
@@ -725,6 +725,12 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	}
 	if err := eg.Wait(); err != nil {
 		err = fmt.Errorf("producing translation messages: %w", err)
+	}
+
+	// Flatten all server jobs into single slice
+	var jobs []sendMessageJob
+	for _, serverJobs := range allServerJobs {
+		jobs = append(jobs, serverJobs...)
 	}
 
 	return jobs, err
