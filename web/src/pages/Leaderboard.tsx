@@ -520,7 +520,7 @@ export function Leaderboard() {
       <SectionMarker label="Rankings" />
 
       {/* Controls row */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 relative z-20">
         {SORT_OPTIONS.map(opt => {
           const isActive = sort === opt.value
           return (
@@ -582,7 +582,7 @@ export function Leaderboard() {
 
       {/* Mobile: collapsible filters */}
       {filtersOpen && (
-        <div className="flex lg:hidden flex-wrap items-center gap-3 animate-fade-in">
+        <div className="flex lg:hidden flex-wrap items-center gap-3 animate-fade-in relative z-20">
           {sort === 'top' && (
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
