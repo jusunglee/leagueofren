@@ -140,6 +140,28 @@ body {
   animation: pixel-fade-in 400ms ease-out both;
 }
 
+@keyframes vote-bounce-up {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes vote-bounce-down {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(6px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes vote-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-4px); }
+  30%, 70% { transform: translateX(4px); }
+}
+
+.animate-vote-up { animation: vote-bounce-up 400ms ease-out; }
+.animate-vote-down { animation: vote-bounce-down 400ms ease-out; }
+.animate-vote-shake { animation: vote-shake 500ms ease-in-out; }
+
 @media (prefers-reduced-motion: reduce) {
   .pixel-sparkle, [class*="bounce"] { animation: none !important; }
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

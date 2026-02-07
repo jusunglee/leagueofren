@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X, MessageSquarePlus, Send } from 'lucide-react'
-import { listTranslations, vote, submitFeedback } from '../lib/api'
+import { listTranslations, vote, submitFeedback, RateLimitError } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
+import type { TranslationListResponse } from '../lib/schemas'
 
 // ── Filled SVG icons for sort tabs ──
 
@@ -116,7 +117,7 @@ function PixelDropdown({ options, value, onChange, placeholder }: {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search..."
-              className="w-full bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] px-2 py-1 text-xs focus:border-[var(--violet)] focus:outline-none"
+              className="w-full bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] px-2 py-1 text-base focus:border-[var(--violet)] focus:outline-none"
             />
           </div>
           <div className="max-h-[240px] overflow-y-auto">
@@ -228,11 +229,12 @@ function buildPorofessorUrl(username: string, region: string) {
   return `https://www.porofessor.gg/live/${region.toLowerCase()}/${encodeURIComponent(username)}`
 }
 
-function TranslationCard({ t, index, onVote, onFeedback }: {
+function TranslationCard({ t, index, onVote, onFeedback, voteAnimation }: {
   t: Translation
   index: number
   onVote: (id: number, dir: 1 | -1) => void
   onFeedback: (id: number, text: string) => void
+  voteAnimation?: 'up' | 'down' | 'shake' | null
 }) {
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
@@ -240,6 +242,11 @@ function TranslationCard({ t, index, onVote, onFeedback }: {
   const score = t.upvotes - t.downvotes
   const isTop3 = index < 3
   const rank = t.rank?.toUpperCase()
+
+  const voteColClass = voteAnimation === 'shake' ? 'animate-vote-shake' : ''
+  const scoreAnimClass = voteAnimation === 'up' ? 'animate-vote-up' : voteAnimation === 'down' ? 'animate-vote-down' : ''
+  const upChevronFlash = voteAnimation === 'up' ? 'text-[var(--secondary)]' : ''
+  const downChevronFlash = voteAnimation === 'down' ? 'text-[var(--destructive)]' : ''
 
   return (
     <div
@@ -252,14 +259,14 @@ function TranslationCard({ t, index, onVote, onFeedback }: {
     >
       <ListRankBadge index={index} />
 
-      <div className="flex flex-col items-center gap-0 min-w-[48px]">
-        <button onClick={() => onVote(t.id, 1)} className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--secondary)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Upvote">
+      <div className={`flex flex-col items-center gap-0 min-w-[48px] ${voteColClass}`}>
+        <button onClick={() => onVote(t.id, 1)} className={`w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--secondary)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${upChevronFlash}`} aria-label="Upvote">
           <ChevronUp size={24} strokeWidth={3} />
         </button>
-        <span className={`pixel-font text-sm leading-none py-1 ${score > 0 ? 'text-[var(--secondary)]' : score < 0 ? 'text-[var(--destructive)]' : 'text-[var(--foreground-muted)]'}`}>
+        <span className={`pixel-font text-sm leading-none py-1 ${scoreAnimClass} ${score > 0 ? 'text-[var(--secondary)]' : score < 0 ? 'text-[var(--destructive)]' : 'text-[var(--foreground-muted)]'}`}>
           {score}
         </span>
-        <button onClick={() => onVote(t.id, -1)} className="w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--destructive)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)]" aria-label="Downvote">
+        <button onClick={() => onVote(t.id, -1)} className={`w-10 h-10 flex items-center justify-center border-2 border-transparent rounded-[4px] hover:border-[var(--destructive)] hover:bg-[var(--muted)] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${downChevronFlash}`} aria-label="Downvote">
           <ChevronDown size={24} strokeWidth={3} />
         </button>
       </div>
@@ -376,6 +383,33 @@ function SectionMarker({ label }: { label: string }) {
   )
 }
 
+// ── Pagination ──
+
+function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (fn: (p: number) => number) => void }) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-center gap-4">
+      <button
+        disabled={page <= 1}
+        onClick={() => setPage(p => p - 1)}
+        className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        &larr; Prev
+      </button>
+      <span className="mono-font text-xs tracking-widest text-[var(--foreground-muted)]">
+        {page} / {totalPages}
+      </span>
+      <button
+        disabled={page >= totalPages}
+        onClick={() => setPage(p => p + 1)}
+        className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+      >
+        Next &rarr;
+      </button>
+    </div>
+  )
+}
+
 // ── Main Component ──
 
 export function Leaderboard() {
@@ -387,15 +421,59 @@ export function Leaderboard() {
   const [rank, setRank] = useState('')
   const [champion, setChampion] = useState('')
   const [page, setPage] = useState(1)
+  const [voteAnimations, setVoteAnimations] = useState<Record<number, 'up' | 'down' | 'shake'>>({})
+
+  const queryKey = ['translations', sort, period, region, language, page]
 
   const { data, isLoading } = useQuery({
-    queryKey: ['translations', sort, period, region, language, page],
+    queryKey,
     queryFn: () => listTranslations({ sort, period, region, language, page, limit: 25 }),
+    refetchInterval: 60_000,
   })
+
+  const triggerVoteAnimation = (id: number, type: 'up' | 'down' | 'shake') => {
+    setVoteAnimations(prev => ({ ...prev, [id]: type }))
+    setTimeout(() => {
+      setVoteAnimations(prev => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }, type === 'shake' ? 500 : 400)
+  }
 
   const voteMutation = useMutation({
     mutationFn: ({ id, direction }: { id: number; direction: 1 | -1 }) => vote(id, direction),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['translations'] }),
+    onMutate: async ({ id, direction }) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<TranslationListResponse>(queryKey)
+      queryClient.setQueryData<TranslationListResponse>(queryKey, old => {
+        if (!old) return old
+        return {
+          ...old,
+          data: old.data.map(t =>
+            t.id === id
+              ? { ...t, upvotes: t.upvotes + (direction === 1 ? 1 : 0), downvotes: t.downvotes + (direction === -1 ? 1 : 0) }
+              : t
+          ),
+        }
+      })
+      triggerVoteAnimation(id, direction === 1 ? 'up' : 'down')
+      return { previous }
+    },
+    onError: (err, { id }, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous)
+      }
+      if (err instanceof RateLimitError) {
+        triggerVoteAnimation(id, 'shake')
+      }
+    },
+    onSettled: () => {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['translations'] })
+      }, 2000)
+    },
   })
 
   const feedbackMutation = useMutation({
@@ -473,6 +551,9 @@ export function Leaderboard() {
         </div>
       </div>
 
+      {/* Pagination — top */}
+      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
+
       {/* Translation Cards */}
       {isLoading ? (
         <div className="pixel-border bg-[var(--card)] pixel-shadow-md p-12 text-center">
@@ -487,6 +568,7 @@ export function Leaderboard() {
               index={(page - 1) * 25 + i}
               onVote={(id, dir) => voteMutation.mutate({ id, direction: dir })}
               onFeedback={(id, text) => feedbackMutation.mutate({ id, text })}
+              voteAnimation={voteAnimations[t.id]}
             />
           ))}
 
@@ -499,28 +581,8 @@ export function Leaderboard() {
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage(p => p - 1)}
-            className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          >
-            &larr; Prev
-          </button>
-          <span className="mono-font text-xs tracking-widest text-[var(--foreground-muted)]">
-            {page} / {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage(p => p + 1)}
-            className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
-          >
-            Next &rarr;
-          </button>
-        </div>
-      )}
+      {/* Pagination — bottom */}
+      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
     </div>
   )
 }
