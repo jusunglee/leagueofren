@@ -126,6 +126,8 @@ release:
 # Deploy by pulling pre-built images from GHCR (fast — no local build)
 # Waits for all workflow runs (CI + Docker) to pass for HEAD before pulling
 deploy:
+	@command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not found. Install it: https://cli.github.com"; exit 1; }
+	@gh auth status >/dev/null 2>&1 || { echo "Error: gh not authenticated. Run: gh auth login"; exit 1; }
 	@COMMIT=$$(git rev-parse HEAD); \
 	SHORT=$$(git rev-parse --short HEAD); \
 	echo "Deploying $$SHORT"; \
