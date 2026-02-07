@@ -59,5 +59,13 @@ services:
       RIOT_API_KEY: ${RIOT_API_KEY}
       INTERVAL: 1h
 
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
 volumes:
   postgres_data:
