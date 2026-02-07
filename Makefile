@@ -20,7 +20,7 @@ help:
 	@echo "  make build-linux    - Build Linux binary"
 	@echo "  make build-darwin   - Build macOS binary"
 	@echo "  make release v=X.Y.Z - Tag and push a release"
-	@echo "  make deploy         - Pull GHCR images and restart"
+	@echo "  make deploy         - Wait for CI build, pull GHCR images, and restart"
 	@echo "  make deploy-local   - Build images locally and restart"
 	@echo "  make clean          - Clean build artifacts"
 
@@ -124,7 +124,26 @@ release:
 	@echo "Released v$(v) — GitHub Actions will build the release."
 
 # Deploy by pulling pre-built images from GHCR (fast — no local build)
+# Waits for the Docker workflow to finish for HEAD before pulling
 deploy:
+	@COMMIT=$$(git rev-parse HEAD); \
+	echo "Waiting for Docker build to finish for $$COMMIT..."; \
+	RUN_ID=$$(gh run list --workflow=docker.yml --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
+	if [ -z "$$RUN_ID" ]; then \
+		echo "No workflow run found for $$COMMIT — waiting for it to appear..."; \
+		for i in $$(seq 1 30); do \
+			sleep 10; \
+			RUN_ID=$$(gh run list --workflow=docker.yml --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
+			if [ -n "$$RUN_ID" ]; then break; fi; \
+			echo "  Still waiting... ($$i/30)"; \
+		done; \
+		if [ -z "$$RUN_ID" ]; then \
+			echo "Error: workflow run never appeared after 5 minutes."; \
+			exit 1; \
+		fi; \
+	fi; \
+	echo "Found run $$RUN_ID — waiting for completion..."; \
+	gh run watch $$RUN_ID --exit-status || { echo "Error: Docker build failed."; exit 1; }
 	docker compose -f docker-compose.prod.yml pull
 	docker compose -f docker-compose.prod.yml up -d
 	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
