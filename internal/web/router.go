@@ -40,6 +40,7 @@ func (r *Router) Handler() http.Handler {
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.List),
 			middleware.RequestLogger(r.log),
+			middleware.CacheControl("public, s-maxage=60, max-age=0"),
 		),
 	)
 
@@ -47,6 +48,7 @@ func (r *Router) Handler() http.Handler {
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.Get),
 			middleware.RequestLogger(r.log),
+			middleware.CacheControl("public, s-maxage=60, max-age=0"),
 		),
 	)
 

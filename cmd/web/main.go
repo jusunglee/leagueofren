@@ -124,11 +124,17 @@ func mainE() error {
 			path = "/index.html"
 		}
 		if _, err := fs.Stat(distFS, strings.TrimPrefix(path, "/")); err == nil {
+			if strings.HasPrefix(path, "/assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				w.Header().Set("Cache-Control", "public, s-maxage=60, max-age=0")
+			}
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 
 		// SPA fallback: serve index.html for any unmatched path
+		w.Header().Set("Cache-Control", "public, s-maxage=60, max-age=0")
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	}))

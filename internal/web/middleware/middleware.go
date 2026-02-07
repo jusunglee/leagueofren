@@ -146,6 +146,15 @@ func RequestLogger(log *slog.Logger) Middleware {
 	}
 }
 
+func CacheControl(value string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", value)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func ClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		if i := strings.IndexByte(xff, ','); i > 0 {
