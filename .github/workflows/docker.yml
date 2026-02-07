@@ -28,6 +28,9 @@ jobs:
           context: .
           file: Dockerfile.web
           push: true
+          build-args: |
+            COMMIT_HASH=${{ github.sha }}
+            COMMIT_DATE=${{ github.event.head_commit.timestamp }}
           tags: |
             ${{ env.IMAGE_PREFIX }}/web:latest
             ${{ env.IMAGE_PREFIX }}/web:${{ github.sha }}

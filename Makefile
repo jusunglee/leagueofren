@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy deploy-local
 
 # Default target
 help:
@@ -20,7 +20,8 @@ help:
 	@echo "  make build-linux    - Build Linux binary"
 	@echo "  make build-darwin   - Build macOS binary"
 	@echo "  make release v=X.Y.Z - Tag and push a release"
-	@echo "  make deploy         - Rebuild and restart via docker compose"
+	@echo "  make deploy         - Pull GHCR images and restart"
+	@echo "  make deploy-local   - Build images locally and restart"
 	@echo "  make clean          - Clean build artifacts"
 
 # Development setup
@@ -122,8 +123,14 @@ release:
 	git push origin main "v$(v)"
 	@echo "Released v$(v) — GitHub Actions will build the release."
 
-# Deploy on the local machine via docker compose (rebuild + restart)
+# Deploy by pulling pre-built images from GHCR (fast — no local build)
 deploy:
+	docker compose -f docker-compose.prod.yml pull
+	docker compose -f docker-compose.prod.yml up -d
+	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
+
+# Deploy by building images locally (slow — use when GHCR images aren't ready)
+deploy-local:
 	COMMIT_HASH=$$(git rev-parse --short HEAD) \
 	COMMIT_DATE=$$(git log -1 --format=%ci) \
 	docker compose -f docker-compose.prod.yml build
