@@ -124,6 +124,8 @@ release:
 
 # Deploy on the local machine via docker compose (rebuild + restart)
 deploy:
+	COMMIT_HASH=$$(git rev-parse --short HEAD) \
+	COMMIT_DATE=$$(git log -1 --format=%ci) \
 	docker compose -f docker-compose.prod.yml build
 	docker compose -f docker-compose.prod.yml up -d
 	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."

@@ -7,8 +7,8 @@ function git(cmd: string): string {
   try { return execSync(cmd).toString().trim() } catch { return 'unknown' }
 }
 
-const commitHash = git('git rev-parse --short HEAD')
-const commitDate = git('git log -1 --format=%ci')
+const commitHash = process.env.VITE_COMMIT_HASH || git('git rev-parse --short HEAD')
+const commitDate = process.env.VITE_COMMIT_DATE || git('git log -1 --format=%ci')
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

@@ -29,6 +29,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+      args:
+        COMMIT_HASH: ${COMMIT_HASH:-unknown}
+        COMMIT_DATE: ${COMMIT_DATE:-unknown}
     image: ghcr.io/jusunglee/leagueofren/web:latest
     restart: unless-stopped
     depends_on:

@@ -1,5 +1,9 @@
 # Stage 1: Build React frontend
 FROM node:22-alpine AS frontend
+ARG COMMIT_HASH=unknown
+ARG COMMIT_DATE=unknown
+ENV VITE_COMMIT_HASH=$COMMIT_HASH
+ENV VITE_COMMIT_DATE=$COMMIT_DATE
 WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci
