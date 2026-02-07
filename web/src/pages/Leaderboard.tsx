@@ -519,7 +519,7 @@ export function Leaderboard() {
     <div className="space-y-6">
       <SectionMarker label="Rankings" />
 
-      {/* Sort tabs + filter toggle */}
+      {/* Controls row */}
       <div className="flex flex-wrap items-center gap-3">
         {SORT_OPTIONS.map(opt => {
           const isActive = sort === opt.value
@@ -541,9 +541,35 @@ export function Leaderboard() {
 
         <div className="flex-1" />
 
+        {/* Desktop: inline filters */}
+        <div className="hidden lg:flex flex-wrap items-center gap-3">
+          {sort === 'top' && (
+            <PixelDropdown
+              options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
+              value={period}
+              onChange={v => { setPeriod(v as PeriodOption); setPage(1) }}
+              placeholder="Period"
+            />
+          )}
+          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
+          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
+          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
+          <PixelDropdown options={championOptions} value={champion} onChange={v => { setChampion(v); setPage(1) }} placeholder="All Champions" />
+          {hasFilters && (
+            <button
+              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setChampion(''); setPage(1) }}
+              className="pixel-font text-[10px] px-3 py-2 bg-[var(--destructive)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[#b83a30] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-1"
+            >
+              <X size={12} strokeWidth={3} />
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Mobile: filter toggle icon */}
         <button
           onClick={() => setFiltersOpen(!filtersOpen)}
-          className={`pixel-font text-xs p-2 lg:px-4 lg:py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+          className={`lg:hidden p-2 pixel-border transition-all duration-150 btn-press inline-flex items-center justify-center focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
             filtersOpen || hasFilters
               ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
               : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
@@ -551,13 +577,12 @@ export function Leaderboard() {
           aria-label="Toggle filters"
         >
           <SlidersHorizontal size={16} strokeWidth={2.5} />
-          <span className="hidden lg:inline">Filters</span>
         </button>
       </div>
 
-      {/* Collapsible filters */}
+      {/* Mobile: collapsible filters */}
       {filtersOpen && (
-        <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+        <div className="flex lg:hidden flex-wrap items-center gap-3 animate-fade-in">
           {sort === 'top' && (
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
