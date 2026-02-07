@@ -554,35 +554,34 @@ export function Leaderboard() {
       {/* Pagination — top */}
       <Pagination page={page} totalPages={totalPages} setPage={setPage} />
 
-      {/* Translation Cards */}
-      {isLoading ? (
-        <div className="pixel-border bg-[var(--card)] pixel-shadow-md p-12 text-center">
-          <p className="pixel-font text-sm text-[var(--foreground-muted)] tracking-wide">Loading translations...</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredData?.map((t, i) => (
-            <TranslationCard
-              key={t.id}
-              t={t}
-              index={(page - 1) * 25 + i}
-              onVote={(id, dir) => voteMutation.mutate({ id, direction: dir })}
-              onFeedback={(id, text) => feedbackMutation.mutate({ id, text })}
-              voteAnimation={voteAnimations[t.id]}
-            />
-          ))}
+      {/* Translation Cards — scrollable container */}
+      <div className="overflow-y-auto max-h-[70vh] pixel-border bg-[var(--background-alt)] p-3 space-y-3">
+        {isLoading ? (
+          <div className="pixel-border bg-[var(--card)] pixel-shadow-md p-12 text-center">
+            <p className="pixel-font text-sm text-[var(--foreground-muted)] tracking-wide">Loading translations...</p>
+          </div>
+        ) : (
+          <>
+            {filteredData?.map((t, i) => (
+              <TranslationCard
+                key={t.id}
+                t={t}
+                index={(page - 1) * 25 + i}
+                onVote={(id, dir) => voteMutation.mutate({ id, direction: dir })}
+                onFeedback={(id, text) => feedbackMutation.mutate({ id, text })}
+                voteAnimation={voteAnimations[t.id]}
+              />
+            ))}
 
-          {(!filteredData || filteredData.length === 0) && !isLoading && (
-            <div className="pixel-border-double bg-[var(--background-alt)] pixel-shadow-violet p-8 lg:p-12 text-center">
-              <p className="pixel-font text-sm text-[var(--foreground-muted)] mb-2">No translations found!</p>
-              <p className="text-sm text-[var(--foreground-muted)]">Try adjusting your filters or check back later.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Pagination — bottom */}
-      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
+            {(!filteredData || filteredData.length === 0) && !isLoading && (
+              <div className="pixel-border-double bg-[var(--background-alt)] pixel-shadow-violet p-8 lg:p-12 text-center">
+                <p className="pixel-font text-sm text-[var(--foreground-muted)] mb-2">No translations found!</p>
+                <p className="text-sm text-[var(--foreground-muted)]">Try adjusting your filters or check back later.</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
