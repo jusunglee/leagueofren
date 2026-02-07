@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy
 
 # Default target
 help:
@@ -19,6 +19,8 @@ help:
 	@echo "  make build-windows  - Build Windows exe"
 	@echo "  make build-linux    - Build Linux binary"
 	@echo "  make build-darwin   - Build macOS binary"
+	@echo "  make release v=X.Y.Z - Tag and push a release"
+	@echo "  make deploy         - Rebuild and restart via docker compose"
 	@echo "  make clean          - Clean build artifacts"
 
 # Development setup
@@ -104,6 +106,27 @@ build-darwin:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/leagueofren-darwin-amd64 cmd/bot/main.go
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/leagueofren-darwin-arm64 cmd/bot/main.go
 	@echo "Built bin/leagueofren-darwin-amd64 and bin/leagueofren-darwin-arm64"
+
+# Tag and push a release (triggers GitHub Actions + GoReleaser)
+# usage: make release v=0.2.0
+release:
+	@if [ -z "$(v)" ]; then \
+		echo "Usage: make release v=0.2.0"; \
+		exit 1; \
+	fi
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Error: working tree is dirty, commit or stash changes first"; \
+		exit 1; \
+	fi
+	git tag "v$(v)"
+	git push origin main "v$(v)"
+	@echo "Released v$(v) — GitHub Actions will build the release."
+
+# Deploy on the local machine via docker compose (rebuild + restart)
+deploy:
+	docker compose -f docker-compose.prod.yml build
+	docker compose -f docker-compose.prod.yml up -d
+	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
 
 # Clean build artifacts
 clean:
