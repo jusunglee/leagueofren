@@ -70,8 +70,8 @@ echo ""
 # Generate a random postgres password
 POSTGRES_PASSWORD=$(openssl rand -hex 16)
 
-# Write .env.prod
-cat > "$INSTALL_DIR/.env.prod" << ENVEOF
+# Write .env
+cat > "$INSTALL_DIR/.env" << ENVEOF
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 RIOT_API_KEY=$RIOT_API_KEY
 LLM_PROVIDER=$LLM_PROVIDER
@@ -79,9 +79,9 @@ LLM_MODEL=$LLM_MODEL
 ${LLM_KEY_NAME}=$LLM_KEY
 ENVEOF
 
-chmod 600 "$INSTALL_DIR/.env.prod"
+chmod 600 "$INSTALL_DIR/.env"
 
-echo "✓ Configuration saved to $INSTALL_DIR/.env.prod"
+echo "✓ Configuration saved to $INSTALL_DIR/.env"
 echo "  (Postgres password auto-generated: $POSTGRES_PASSWORD)"
 echo ""
 
@@ -104,8 +104,8 @@ echo "─── Deploying ───"
 echo ""
 
 cd "$INSTALL_DIR"
-docker compose --env-file .env.prod -f docker-compose.prod.yml pull
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+docker compose --env-file .env -f docker-compose.prod.yml pull
+docker compose --env-file .env -f docker-compose.prod.yml up -d
 
 echo ""
 echo "─── Done! ───"
@@ -119,10 +119,10 @@ echo "  Enable proxy (orange cloud) for free TLS"
 echo ""
 echo "  Manage:"
 echo "    cd $INSTALL_DIR"
-echo "    docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f"
-echo "    docker compose --env-file .env.prod -f docker-compose.prod.yml restart"
-echo "    docker compose --env-file .env.prod -f docker-compose.prod.yml down"
+echo "    docker compose --env-file .env -f docker-compose.prod.yml logs -f"
+echo "    docker compose --env-file .env -f docker-compose.prod.yml restart"
+echo "    docker compose --env-file .env -f docker-compose.prod.yml down"
 echo ""
 echo "  Update:"
-echo "    cd $INSTALL_DIR && git pull && docker compose --env-file .env.prod -f docker-compose.prod.yml pull && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d"
+echo "    cd $INSTALL_DIR && git pull && docker compose --env-file .env -f docker-compose.prod.yml pull && docker compose --env-file .env -f docker-compose.prod.yml up -d"
 echo ""
