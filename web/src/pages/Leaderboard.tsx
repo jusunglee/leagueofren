@@ -216,6 +216,21 @@ function ListRankBadge({ index }: { index: number }) {
   )
 }
 
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}mo ago`
+  const years = Math.floor(days / 365)
+  return `${years}y ago`
+}
+
 function buildLearnMoreUrl(username: string, translation: string, explanation: string | null) {
   const prompt = `Tell me more about the League of Legends summoner name "${username}". It translates to "${translation}"${explanation ? ` (${explanation})` : ''}. What's the cultural context, any references to games, anime, literature, or memes? Is this a common naming pattern?`
   return `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`
@@ -282,7 +297,7 @@ function TranslationCard({ t, index, onVote, onFeedback, voteAnimation }: {
         )}
         {t.first_seen && (
           <p className="mono-font text-[10px] text-[var(--foreground-muted)] mt-1 tracking-wide" style={{ opacity: 0.6 }}>
-            first seen {new Date(t.first_seen).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            first seen {timeAgo(t.first_seen)}
           </p>
         )}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
