@@ -528,14 +528,14 @@ export function Leaderboard() {
 
         <button
           onClick={() => setFiltersOpen(!filtersOpen)}
-          className={`pixel-font text-xs px-4 py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+          className={`p-2 pixel-border transition-all duration-150 btn-press inline-flex items-center justify-center focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
             filtersOpen || hasFilters
               ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
               : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
           }`}
+          aria-label="Toggle filters"
         >
-          <SlidersHorizontal size={14} strokeWidth={2.5} />
-          Filters{hasFilters ? ' *' : ''}
+          <SlidersHorizontal size={16} strokeWidth={2.5} />
         </button>
       </div>
 
