@@ -445,10 +445,10 @@ export function Leaderboard() {
           )
         })}
 
-        <div className="flex-1" />
+        <div className="hidden lg:block flex-1" />
 
         {/* Filters — custom pixel dropdowns */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {sort === 'top' && (
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}

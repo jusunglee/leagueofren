@@ -1,20 +1,37 @@
 #!/bin/sh
 
-# Pre-commit hook: gofmt + compile
+# Pre-commit hook: check affected areas and build accordingly
 
 set -e
 
-echo "Running gofmt..."
-UNFORMATTED=$(gofmt -l .)
-if [ -n "$UNFORMATTED" ]; then
-    echo "Formatting files:"
-    echo "$UNFORMATTED"
-    gofmt -w .
-    echo "$UNFORMATTED" | xargs git add
-    echo "Formatted and staged."
+STAGED=$(git diff --cached --name-only)
+
+# Go: format and build bot if any .go files changed
+if echo "$STAGED" | grep -q '\.go$'; then
+    echo "Running gofmt..."
+    UNFORMATTED=$(gofmt -l .)
+    if [ -n "$UNFORMATTED" ]; then
+        echo "Formatting files:"
+        echo "$UNFORMATTED"
+        gofmt -w .
+        echo "$UNFORMATTED" | xargs git add
+        echo "Formatted and staged."
+    fi
+
+    echo "Running go build (bot)..."
+    go build ./cmd/bot/...
 fi
 
-echo "Running go build..."
-go build ./...
+# Web: build frontend and go embed if web/ files changed
+if echo "$STAGED" | grep -q '^web/'; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+    echo "Building web frontend..."
+    (cd web && npx vite build --outDir ../cmd/web/dist --emptyOutDir)
+
+    echo "Running go build (web)..."
+    go build -o /dev/null ./cmd/web
+fi
 
 echo "Pre-commit checks passed"
