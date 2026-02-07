@@ -124,26 +124,41 @@ release:
 	@echo "Released v$(v) — GitHub Actions will build the release."
 
 # Deploy by pulling pre-built images from GHCR (fast — no local build)
-# Waits for the Docker workflow to finish for HEAD before pulling
+# Waits for all workflow runs (CI + Docker) to pass for HEAD before pulling
 deploy:
 	@COMMIT=$$(git rev-parse HEAD); \
-	echo "Waiting for Docker build to finish for $$COMMIT..."; \
-	RUN_ID=$$(gh run list --workflow=docker.yml --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
-	if [ -z "$$RUN_ID" ]; then \
-		echo "No workflow run found for $$COMMIT — waiting for it to appear..."; \
+	echo "Deploying commit $$COMMIT"; \
+	echo ""; \
+	for WORKFLOW in ci.yml docker.yml; do \
+		echo "── $$WORKFLOW ──"; \
+		RUN_ID=""; \
 		for i in $$(seq 1 30); do \
-			sleep 10; \
-			RUN_ID=$$(gh run list --workflow=docker.yml --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
+			RUN_ID=$$(gh run list --workflow=$$WORKFLOW --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
 			if [ -n "$$RUN_ID" ]; then break; fi; \
-			echo "  Still waiting... ($$i/30)"; \
+			if [ $$i -eq 1 ]; then echo "Waiting for workflow run to appear..."; fi; \
+			sleep 10; \
 		done; \
 		if [ -z "$$RUN_ID" ]; then \
-			echo "Error: workflow run never appeared after 5 minutes."; \
+			echo "Error: $$WORKFLOW run never appeared after 5 minutes."; \
 			exit 1; \
 		fi; \
-	fi; \
-	echo "Found run $$RUN_ID — waiting for completion..."; \
-	gh run watch $$RUN_ID --exit-status || { echo "Error: Docker build failed."; exit 1; }
+		STATUS=$$(gh run view $$RUN_ID --json status,conclusion --jq '.status'); \
+		CONCLUSION=$$(gh run view $$RUN_ID --json conclusion --jq '.conclusion'); \
+		if [ "$$STATUS" = "completed" ]; then \
+			if [ "$$CONCLUSION" = "success" ]; then \
+				echo "$$WORKFLOW: passed"; \
+			else \
+				echo "Error: $$WORKFLOW failed ($$CONCLUSION)."; \
+				echo "See: gh run view $$RUN_ID --log-failed"; \
+				exit 1; \
+			fi; \
+		else \
+			echo "$$WORKFLOW: in progress — watching..."; \
+			gh run watch $$RUN_ID --exit-status || { echo "Error: $$WORKFLOW failed."; echo "See: gh run view $$RUN_ID --log-failed"; exit 1; }; \
+			echo "$$WORKFLOW: passed"; \
+		fi; \
+		echo ""; \
+	done
 	docker compose -f docker-compose.prod.yml pull
 	docker compose -f docker-compose.prod.yml up -d
 	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
