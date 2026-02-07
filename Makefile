@@ -134,13 +134,14 @@ deploy:
 		echo "── $$WORKFLOW ──"; \
 		RUN_ID=""; \
 		for i in $$(seq 1 30); do \
-			RUN_ID=$$(gh run list --workflow=$$WORKFLOW --branch=main -L 5 --json databaseId,headSha --jq "[.[] | select(.headSha == \"$$COMMIT\")] | .[0].databaseId // empty" 2>/dev/null); \
-			if [ -n "$$RUN_ID" ]; then break; fi; \
-			if [ $$i -eq 1 ]; then echo "Waiting for run to appear..."; fi; \
+			RUN_ID=$$(gh api "repos/{owner}/{repo}/actions/workflows/$$WORKFLOW/runs?head_sha=$$COMMIT&per_page=1" --jq '.workflow_runs[0].id // empty' 2>/dev/null); \
+			if [ -n "$$RUN_ID" ] && [ "$$RUN_ID" != "null" ]; then break; fi; \
+			RUN_ID=""; \
+			if [ $$i -eq 1 ]; then echo "  waiting for run to appear..."; fi; \
 			sleep 10; \
 		done; \
 		if [ -z "$$RUN_ID" ]; then \
-			echo "Error: $$WORKFLOW run not found for $$SHORT after 5 minutes."; \
+			echo "  ERROR: run not found for $$SHORT after 5 minutes."; \
 			exit 1; \
 		fi; \
 		STATUS=$$(gh run view $$RUN_ID --json status,conclusion --jq '.status'); \
