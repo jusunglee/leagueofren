@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X, MessageSquarePlus, Send } from 'lucide-react'
+import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X, MessageSquarePlus, Send, SlidersHorizontal } from 'lucide-react'
 import { listTranslations, vote, submitFeedback, RateLimitError } from '../lib/api'
 import type { SortOption, PeriodOption, Translation } from '../lib/schemas'
 import type { TranslationListResponse } from '../lib/schemas'
@@ -421,6 +421,7 @@ export function Leaderboard() {
   const [rank, setRank] = useState('')
   const [champion, setChampion] = useState('')
   const [page, setPage] = useState(1)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [voteAnimations, setVoteAnimations] = useState<Record<number, 'up' | 'down' | 'shake'>>({})
 
   const queryKey = ['translations', sort, period, region, language, page]
@@ -503,7 +504,7 @@ export function Leaderboard() {
     <div className="space-y-6">
       <SectionMarker label="Rankings" />
 
-      {/* Controls row */}
+      {/* Sort tabs + filter toggle */}
       <div className="flex flex-wrap items-center gap-3">
         {SORT_OPTIONS.map(opt => {
           const isActive = sort === opt.value
@@ -523,10 +524,24 @@ export function Leaderboard() {
           )
         })}
 
-        <div className="hidden lg:block flex-1" />
+        <div className="flex-1" />
 
-        {/* Filters — custom pixel dropdowns */}
-        <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          className={`pixel-font text-xs px-4 py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${
+            filtersOpen || hasFilters
+              ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
+              : 'bg-[var(--card)] pixel-shadow-sm hover:bg-[var(--muted)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)]'
+          }`}
+        >
+          <SlidersHorizontal size={14} strokeWidth={2.5} />
+          Filters{hasFilters ? ' *' : ''}
+        </button>
+      </div>
+
+      {/* Collapsible filters */}
+      {filtersOpen && (
+        <div className="flex flex-wrap items-center gap-3 animate-fade-in">
           {sort === 'top' && (
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
@@ -549,7 +564,7 @@ export function Leaderboard() {
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {/* Pagination — top */}
       <Pagination page={page} totalPages={totalPages} setPage={setPage} />
