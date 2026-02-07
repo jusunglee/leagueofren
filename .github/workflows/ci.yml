@@ -15,8 +15,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-          stable: false
+          go-version: '1.26.0-rc.2'
 
       - name: Build
         run: go build -v ./...
@@ -36,8 +35,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
-          stable: false
+          go-version: '1.26.0-rc.2'
 
       - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
         env:

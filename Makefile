@@ -127,35 +127,36 @@ release:
 # Waits for all workflow runs (CI + Docker) to pass for HEAD before pulling
 deploy:
 	@COMMIT=$$(git rev-parse HEAD); \
-	echo "Deploying commit $$COMMIT"; \
+	SHORT=$$(git rev-parse --short HEAD); \
+	echo "Deploying $$SHORT"; \
 	echo ""; \
 	for WORKFLOW in ci.yml docker.yml; do \
 		echo "── $$WORKFLOW ──"; \
 		RUN_ID=""; \
 		for i in $$(seq 1 30); do \
-			RUN_ID=$$(gh run list --workflow=$$WORKFLOW --commit=$$COMMIT --json databaseId --jq '.[0].databaseId' 2>/dev/null); \
+			RUN_ID=$$(gh run list --workflow=$$WORKFLOW --branch=main -L 5 --json databaseId,headSha --jq "[.[] | select(.headSha == \"$$COMMIT\")] | .[0].databaseId // empty" 2>/dev/null); \
 			if [ -n "$$RUN_ID" ]; then break; fi; \
-			if [ $$i -eq 1 ]; then echo "Waiting for workflow run to appear..."; fi; \
+			if [ $$i -eq 1 ]; then echo "Waiting for run to appear..."; fi; \
 			sleep 10; \
 		done; \
 		if [ -z "$$RUN_ID" ]; then \
-			echo "Error: $$WORKFLOW run never appeared after 5 minutes."; \
+			echo "Error: $$WORKFLOW run not found for $$SHORT after 5 minutes."; \
 			exit 1; \
 		fi; \
 		STATUS=$$(gh run view $$RUN_ID --json status,conclusion --jq '.status'); \
 		CONCLUSION=$$(gh run view $$RUN_ID --json conclusion --jq '.conclusion'); \
 		if [ "$$STATUS" = "completed" ]; then \
 			if [ "$$CONCLUSION" = "success" ]; then \
-				echo "$$WORKFLOW: passed"; \
+				echo "  passed"; \
 			else \
-				echo "Error: $$WORKFLOW failed ($$CONCLUSION)."; \
-				echo "See: gh run view $$RUN_ID --log-failed"; \
+				echo "  FAILED ($$CONCLUSION)"; \
+				echo "  Run: gh run view $$RUN_ID --log-failed"; \
 				exit 1; \
 			fi; \
 		else \
-			echo "$$WORKFLOW: in progress — watching..."; \
-			gh run watch $$RUN_ID --exit-status || { echo "Error: $$WORKFLOW failed."; echo "See: gh run view $$RUN_ID --log-failed"; exit 1; }; \
-			echo "$$WORKFLOW: passed"; \
+			echo "  in progress — watching..."; \
+			gh run watch $$RUN_ID --exit-status || { echo "  FAILED"; echo "  Run: gh run view $$RUN_ID --log-failed"; exit 1; }; \
+			echo "  passed"; \
 		fi; \
 		echo ""; \
 	done
