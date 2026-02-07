@@ -109,8 +109,30 @@ func runRefresh(ctx context.Context, repo db.Repository, riotClient *riot.Direct
 			return
 		}
 
+		// Backfill puuid if missing
 		if !player.Puuid.Valid {
-			continue
+			gameName, tagLine, err := riot.ParseRiotID(player.Username)
+			if err != nil || tagLine == "" {
+				continue
+			}
+			account, err := riotClient.GetAccountByRiotID(gameName, tagLine, player.Region)
+			if err != nil {
+				log.WarnContext(ctx, "puuid lookup failed", "username", player.Username, "error", err)
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			player.Puuid = sql.NullString{String: account.PUUID, Valid: true}
+			_, err = repo.UpsertPlayer(ctx, db.UpsertPlayerParams{
+				Username: player.Username,
+				Region:   player.Region,
+				Puuid:    player.Puuid,
+			})
+			if err != nil {
+				log.ErrorContext(ctx, "saving puuid", "username", player.Username, "error", err)
+				continue
+			}
+			log.InfoContext(ctx, "backfilled puuid", "username", player.Username)
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		entries, err := riotClient.GetRankedEntries(player.Puuid.String, player.Region)

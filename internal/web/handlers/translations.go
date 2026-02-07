@@ -265,13 +265,15 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		tagLine = ""
 	}
 
+	var puuid string
 	if tagLine != "" {
-		_, err = h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
+		account, err := h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
 		if err != nil {
 			h.log.WarnContext(r.Context(), "riot lookup failed", "gameName", gameName, "tagLine", tagLine, "region", req.Region, "error", err)
 			writeError(w, http.StatusBadRequest, "username not found on Riot servers")
 			return
 		}
+		puuid = account.PUUID
 	}
 
 	// Server-side translation via LLM (ignores any client-provided translation)
@@ -290,6 +292,7 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		_, err := txRepo.UpsertPlayer(r.Context(), db.UpsertPlayerParams{
 			Username: req.Username,
 			Region:   req.Region,
+			Puuid:    sql.NullString{String: puuid, Valid: puuid != ""},
 		})
 		if err != nil {
 			return err
