@@ -41,7 +41,7 @@ func (r *Router) Handler() http.Handler {
 			http.HandlerFunc(translationHandler.List),
 			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
-			middleware.CacheControl("public, s-maxage=60, max-age=0"),
+			middleware.CacheControl("public, s-maxage=5, max-age=0"),
 		),
 	)
 
@@ -50,7 +50,7 @@ func (r *Router) Handler() http.Handler {
 			http.HandlerFunc(translationHandler.Get),
 			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
-			middleware.CacheControl("public, s-maxage=60, max-age=0"),
+			middleware.CacheControl("public, s-maxage=5, max-age=0"),
 		),
 	)
 
