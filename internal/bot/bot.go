@@ -610,6 +610,7 @@ func (b *Bot) respond(s *discordgo.Session, i *discordgo.InteractionCreate, cont
 type sendMessageJob struct {
 	username       string
 	translations   []translation.Translation
+	riotIDs        map[string]string // game name -> full Riot ID (name#tag)
 	subscriptionID int64
 	channelID      string
 	gameID         int64
@@ -655,6 +656,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 			}
 
 			var names []string
+			riotIDs := make(map[string]string) // game name -> full Riot ID
 			for _, p := range game.Participants {
 				if !containsForeignCharacters(p.GameName) {
 					continue
@@ -671,6 +673,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 					return fmt.Errorf("unable to parse riot id %s: %w", p.GameName, err)
 				}
 				names = append(names, name)
+				riotIDs[name] = p.GameName
 			}
 
 			if len(names) == 0 {
@@ -686,6 +689,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 			jobs = append(jobs, sendMessageJob{
 				username:       sub.LolUsername,
 				translations:   translations,
+				riotIDs:        riotIDs,
 				channelID:      sub.DiscordChannelID,
 				subscriptionID: sub.ID,
 				gameID:         game.GameID,
@@ -751,7 +755,7 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 
 	// Best-effort: submit usernames to the companion website for server-side translation
 	if b.websiteClient.Enabled() {
-		if err := b.websiteClient.SubmitTranslations(ctx, job.translations, job.region); err != nil {
+		if err := b.websiteClient.SubmitTranslations(ctx, job.translations, job.riotIDs, job.region); err != nil {
 			b.log.WarnContext(ctx, "failed to submit translations to website", "error", err)
 		}
 	}

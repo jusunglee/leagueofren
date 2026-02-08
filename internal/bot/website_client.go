@@ -36,14 +36,19 @@ type websiteSubmission struct {
 	Region   string `json:"region"`
 }
 
-func (w *WebsiteClient) SubmitTranslations(ctx context.Context, translations []translation.Translation, region string) error {
+func (w *WebsiteClient) SubmitTranslations(ctx context.Context, translations []translation.Translation, riotIDs map[string]string, region string) error {
 	if !w.Enabled() {
 		return nil
 	}
 
 	for _, t := range translations {
+		// Use full Riot ID (name#tag) if available, fall back to game name
+		username := t.Original
+		if fullID, ok := riotIDs[t.Original]; ok {
+			username = fullID
+		}
 		body := websiteSubmission{
-			Username: t.Original,
+			Username: username,
 			Region:   region,
 		}
 
