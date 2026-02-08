@@ -489,6 +489,19 @@ export function Leaderboard() {
       triggerVoteAnimation(id, direction === 1 ? 'up' : 'down')
       return { previous }
     },
+    onSuccess: (data, { id }) => {
+      queryClient.setQueryData<TranslationListResponse>(queryKey, old => {
+        if (!old) return old
+        return {
+          ...old,
+          data: old.data.map(t =>
+            t.id === id
+              ? { ...t, upvotes: data.upvotes, downvotes: data.downvotes }
+              : t
+          ),
+        }
+      })
+    },
     onError: (err, { id }, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKey, context.previous)
@@ -496,11 +509,6 @@ export function Leaderboard() {
       if (err instanceof RateLimitError) {
         triggerVoteAnimation(id, 'shake')
       }
-    },
-    onSettled: () => {
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['translations'] })
-      }, 2000)
     },
   })
 
