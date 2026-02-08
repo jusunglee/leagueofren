@@ -300,6 +300,93 @@
         { "expr": "go_memstats_sys_bytes{job=\"web\"}", "legendFormat": "web sys", "refId": "C" },
         { "expr": "go_memstats_sys_bytes{job=\"worker\"}", "legendFormat": "worker sys", "refId": "D" }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "id": 107,
+      "title": "Logs",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+      "id": 20,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "Web Server Logs",
+      "type": "logs",
+      "targets": [
+        { "expr": "{container=~\"leagueofren-web-.*\"}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 78 },
+      "id": 21,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "Worker Logs",
+      "type": "logs",
+      "targets": [
+        { "expr": "{container=~\"leagueofren-worker-.*\"}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 88 },
+      "id": 22,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "Nginx Logs",
+      "type": "logs",
+      "targets": [
+        { "expr": "{container=~\"leagueofren-nginx-1\"}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 98 },
+      "id": 23,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "All Services (Errors)",
+      "type": "logs",
+      "targets": [
+        { "expr": "{container=~\"leagueofren-.*\"} |~ \"(?i)(error|fatal|panic)\"", "refId": "A" }
+      ]
     }
   ],
   "refresh": "30s",
