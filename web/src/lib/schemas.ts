@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const translationSchema = z.object({
   id: z.number(),
   username: z.string(),
+  transliteration: z.string(),
   translation: z.string(),
   explanation: z.string().nullable(),
   language: z.string(),

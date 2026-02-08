@@ -13,6 +13,7 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
+	"github.com/jusunglee/leagueofren/internal/transliteration"
 )
 
 type TranslationHandler struct {
@@ -27,20 +28,21 @@ func NewTranslationHandler(repo db.Repository, log *slog.Logger, riotClient *rio
 }
 
 type translationResponse struct {
-	ID           int64    `json:"id"`
-	Username     string   `json:"username"`
-	Translation  string   `json:"translation"`
-	Explanation  *string  `json:"explanation,omitempty"`
-	Language     string   `json:"language"`
-	Region       string   `json:"region"`
-	RiotVerified bool     `json:"riot_verified"`
-	Rank         *string  `json:"rank,omitempty"`
-	TopChampions []string `json:"top_champions,omitempty"`
-	Upvotes      int32    `json:"upvotes"`
-	Downvotes    int32    `json:"downvotes"`
-	Score        float64  `json:"score,omitempty"`
-	CreatedAt    string   `json:"created_at"`
-	FirstSeen    string   `json:"first_seen,omitempty"`
+	ID              int64    `json:"id"`
+	Username        string   `json:"username"`
+	Transliteration string   `json:"transliteration"`
+	Translation     string   `json:"translation"`
+	Explanation     *string  `json:"explanation,omitempty"`
+	Language        string   `json:"language"`
+	Region          string   `json:"region"`
+	RiotVerified    bool     `json:"riot_verified"`
+	Rank            *string  `json:"rank,omitempty"`
+	TopChampions    []string `json:"top_champions,omitempty"`
+	Upvotes         int32    `json:"upvotes"`
+	Downvotes       int32    `json:"downvotes"`
+	Score           float64  `json:"score,omitempty"`
+	CreatedAt       string   `json:"created_at"`
+	FirstSeen       string   `json:"first_seen,omitempty"`
 }
 
 type paginationMeta struct {
@@ -56,16 +58,17 @@ type listResponse struct {
 
 func toTranslationResponse(t db.PublicTranslation) translationResponse {
 	resp := translationResponse{
-		ID:           t.ID,
-		Username:     t.Username,
-		Translation:  t.Translation,
-		Language:     t.Language,
-		Region:       t.Region,
-		RiotVerified: t.RiotVerified,
-		Upvotes:      t.Upvotes,
-		Downvotes:    t.Downvotes,
-		CreatedAt:    t.CreatedAt.Format(time.RFC3339),
-		FirstSeen:    t.FirstSeen.Format(time.RFC3339),
+		ID:              t.ID,
+		Username:        t.Username,
+		Transliteration: transliteration.Transliterate(t.Username),
+		Translation:     t.Translation,
+		Language:        t.Language,
+		Region:          t.Region,
+		RiotVerified:    t.RiotVerified,
+		Upvotes:         t.Upvotes,
+		Downvotes:       t.Downvotes,
+		CreatedAt:       t.CreatedAt.Format(time.RFC3339),
+		FirstSeen:       t.FirstSeen.Format(time.RFC3339),
 	}
 	if t.Explanation.Valid {
 		resp.Explanation = &t.Explanation.String
