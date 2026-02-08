@@ -323,6 +323,7 @@ function TranslationCard({ t, index, onVote, onFeedback, voteAnimation }: {
             </span>
           ) : t.top_champions && t.top_champions.length > 0 ? (
             <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 text-[var(--foreground-muted)]">
+              <img src="/unranked.png" alt="" className="w-4 h-4 object-contain" aria-hidden="true" />
               UNRANKED
             </span>
           ) : null}
