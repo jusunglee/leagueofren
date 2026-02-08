@@ -631,7 +631,7 @@ export function Leaderboard() {
       <Pagination page={page} totalPages={totalPages} setPage={setPage} />
 
       {/* Translation Cards — scrollable container */}
-      <div className="overflow-y-auto max-h-[70vh] pixel-border bg-[var(--background-alt)] p-3 space-y-3">
+      <div className="overflow-y-auto overflow-x-hidden max-h-[70vh] pixel-border bg-[var(--background-alt)] p-3 space-y-3">
         {isLoading ? (
           <div className="pixel-border bg-[var(--card)] pixel-shadow-md p-12 text-center">
             <p className="pixel-font text-sm text-[var(--foreground-muted)] tracking-wide">Loading translations...</p>
