@@ -1,0 +1,315 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Service Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Service Status",
+      "type": "stat",
+      "targets": [
+        { "expr": "up", "legendFormat": "{{job}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Request Rate (5m)",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(rate(lor_http_requests_total[5m]))", "legendFormat": "req/s", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "title": "Error Rate (5xx, 5m)",
+      "type": "stat",
+      "targets": [
+        { "expr": "sum(rate(lor_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(lor_http_requests_total[5m]))", "legendFormat": "error %", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "HTTP Traffic",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "title": "Request Rate by Route",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (route) (rate(lor_http_requests_total[5m]))", "legendFormat": "{{route}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "title": "Request Latency by Route (p95)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (route, le) (rate(lor_http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "title": "Response Status Codes",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (status) (rate(lor_http_requests_total[5m]))", "legendFormat": "{{status}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Rate Limit Hits",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(lor_rate_limit_hits_total[5m])", "legendFormat": "rate limit hits/s", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 102,
+      "title": "Translations & Votes",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "id": 8,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Translation Submissions",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(lor_translation_submissions_total[5m])", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "id": 9,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Vote Activity",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(lor_votes_total[5m])", "legendFormat": "{{direction}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "id": 10,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "LLM Translation Latency (p95)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(lor_llm_translation_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.50, rate(lor_llm_translation_duration_seconds_bucket[5m]))", "legendFormat": "p50", "refId": "B" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 103,
+      "title": "Worker",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+      "id": 11,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Worker Refresh Cycle Duration",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(lor_worker_refresh_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "A" },
+        { "expr": "lor_worker_players_processed", "legendFormat": "players processed", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+      "id": 12,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
+      "title": "Riot API Calls",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (endpoint, result) (rate(lor_riot_api_calls_total[5m]))", "legendFormat": "{{endpoint}} {{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "id": 13,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
+      "title": "Riot API Latency (p95)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (endpoint, le) (rate(lor_riot_api_duration_seconds_bucket[5m])))", "legendFormat": "{{endpoint}}", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "id": 104,
+      "title": "Database Pool",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 20, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "id": 14,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "DB Connection Pool",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "lor_db_pool_acquired_conns", "legendFormat": "acquired", "refId": "A" },
+        { "expr": "lor_db_pool_idle_conns", "legendFormat": "idle", "refId": "B" },
+        { "expr": "lor_db_pool_max_conns", "legendFormat": "max", "refId": "C" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "id": 15,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "PUUID Backfill",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(lor_worker_puuid_backfill_total[5m])", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "id": 105,
+      "title": "Nginx",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "id": 16,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Nginx Active Connections",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "nginx_connections_active", "legendFormat": "active", "refId": "A" },
+        { "expr": "nginx_connections_reading", "legendFormat": "reading", "refId": "B" },
+        { "expr": "nginx_connections_writing", "legendFormat": "writing", "refId": "C" },
+        { "expr": "nginx_connections_waiting", "legendFormat": "waiting", "refId": "D" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+      "id": 17,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Nginx Request Rate",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(nginx_http_requests_total[5m])", "legendFormat": "requests/s", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
+      "id": 106,
+      "title": "Go Runtime",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 59 },
+      "id": 18,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Goroutines",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "go_goroutines{job=\"web\"}", "legendFormat": "web", "refId": "A" },
+        { "expr": "go_goroutines{job=\"worker\"}", "legendFormat": "worker", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 59 },
+      "id": 19,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "go_memstats_alloc_bytes{job=\"web\"}", "legendFormat": "web alloc", "refId": "A" },
+        { "expr": "go_memstats_alloc_bytes{job=\"worker\"}", "legendFormat": "worker alloc", "refId": "B" },
+        { "expr": "go_memstats_sys_bytes{job=\"web\"}", "legendFormat": "web sys", "refId": "C" },
+        { "expr": "go_memstats_sys_bytes{job=\"worker\"}", "legendFormat": "worker sys", "refId": "D" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["leagueofren"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "League of Ren",
+  "uid": "leagueofren-dashboard",
+  "version": 1
+}

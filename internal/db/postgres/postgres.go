@@ -53,6 +53,11 @@ func (r *Repository) Close() error {
 	return nil
 }
 
+// PoolStats returns the connection pool statistics for metrics collection.
+func (r *Repository) PoolStats() *pgxpool.Stat {
+	return r.pool.Stat()
+}
+
 func (r *Repository) WithTx(ctx context.Context, fn func(repo db.Repository) error) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

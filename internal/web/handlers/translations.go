@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/jusunglee/leagueofren/internal/transliteration"
@@ -276,8 +277,11 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	puuid := account.PUUID
 
 	// Server-side translation via LLM (ignores any client-provided translation)
+	llmStart := time.Now()
 	translations, err := h.translator.TranslateUsernames(r.Context(), []string{gameName})
+	metrics.LLMTranslationDuration.Observe(time.Since(llmStart).Seconds())
 	if err != nil || len(translations) == 0 {
+		metrics.TranslationSubmissions.WithLabelValues("failed").Inc()
 		h.log.WarnContext(r.Context(), "translation failed", "username", req.Username, "error", err)
 		writeError(w, http.StatusInternalServerError, "translation failed")
 		return
@@ -312,11 +316,13 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
+		metrics.TranslationSubmissions.WithLabelValues("failed").Inc()
 		h.log.ErrorContext(r.Context(), "upserting translation", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
+	metrics.TranslationSubmissions.WithLabelValues("success").Inc()
 	result.Region = req.Region
 
 	writeJSON(w, http.StatusCreated, toTranslationResponse(result))

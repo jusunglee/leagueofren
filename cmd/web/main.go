@@ -20,11 +20,13 @@ import (
 	"github.com/jusunglee/leagueofren/internal/google"
 	"github.com/jusunglee/leagueofren/internal/llm"
 	"github.com/jusunglee/leagueofren/internal/logger"
+	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/jusunglee/leagueofren/internal/web"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 //go:embed all:dist
@@ -97,6 +99,24 @@ func mainE() error {
 	defer repo.Close()
 	log.InfoContext(ctx, "connected to PostgreSQL database")
 
+	// Periodically export pgxpool stats as Prometheus gauges
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s := repo.PoolStats()
+				metrics.DBPoolTotalConns.Set(float64(s.TotalConns()))
+				metrics.DBPoolIdleConns.Set(float64(s.IdleConns()))
+				metrics.DBPoolAcquiredConns.Set(float64(s.AcquiredConns()))
+				metrics.DBPoolMaxConns.Set(float64(s.MaxConns()))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	riotClient := riot.NewDirectClient(*riotAPIKey)
 	translator := translation.NewTranslator(llmClient, repo, *llmProvider, *llmModel)
 
@@ -111,6 +131,7 @@ func mainE() error {
 	fileServer := http.FileServer(http.FS(distFS))
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// API routes go to the router
 		if strings.HasPrefix(r.URL.Path, "/api/") {

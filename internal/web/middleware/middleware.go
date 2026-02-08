@@ -4,9 +4,12 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jusunglee/leagueofren/internal/metrics"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -109,10 +112,32 @@ func RateLimit(limiter *IPRateLimiter) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := ClientIP(r)
 			if !limiter.Allow(ip) {
+				metrics.RateLimitHits.Inc()
 				http.Error(w, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func PrometheusMetrics() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+
+			next.ServeHTTP(rec, r)
+
+			route := r.Pattern
+			if route == "" {
+				route = "unmatched"
+			}
+			status := strconv.Itoa(rec.status)
+			duration := time.Since(start).Seconds()
+
+			metrics.HTTPRequestsTotal.WithLabelValues(route, r.Method, status).Inc()
+			metrics.HTTPRequestDuration.WithLabelValues(route, r.Method).Observe(duration)
 		})
 	}
 }

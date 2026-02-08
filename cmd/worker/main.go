@@ -18,9 +18,11 @@ import (
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/db/postgres"
 	"github.com/jusunglee/leagueofren/internal/logger"
+	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -70,6 +72,35 @@ func mainE() error {
 	}
 	log.InfoContext(ctx, "loaded champion map", "count", len(champMap))
 
+	// Serve Prometheus metrics on :9090
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{Addr: ":9090", Handler: metricsMux}
+		log.InfoContext(ctx, "starting metrics server", "addr", ":9090")
+		if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.ErrorContext(ctx, "metrics server error", "error", err)
+		}
+	}()
+
+	// Periodically export pgxpool stats as Prometheus gauges
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s := repo.PoolStats()
+				metrics.DBPoolTotalConns.Set(float64(s.TotalConns()))
+				metrics.DBPoolIdleConns.Set(float64(s.IdleConns()))
+				metrics.DBPoolAcquiredConns.Set(float64(s.AcquiredConns()))
+				metrics.DBPoolMaxConns.Set(float64(s.MaxConns()))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -96,12 +127,18 @@ func mainE() error {
 }
 
 func runRefresh(ctx context.Context, repo db.Repository, riotClient *riot.DirectClient, champMap map[int64]string, log *slog.Logger) {
+	cycleStart := time.Now()
+	defer func() {
+		metrics.RefreshCycleDuration.Observe(time.Since(cycleStart).Seconds())
+	}()
+
 	players, err := repo.ListAllPlayers(ctx)
 	if err != nil {
 		log.ErrorContext(ctx, "listing players", "error", err)
 		return
 	}
 
+	metrics.PlayersProcessed.Set(float64(len(players)))
 	log.InfoContext(ctx, "starting player refresh", "count", len(players))
 
 	for _, player := range players {
@@ -115,12 +152,17 @@ func runRefresh(ctx context.Context, repo db.Repository, riotClient *riot.Direct
 			if err != nil || tagLine == "" {
 				continue
 			}
+			apiStart := time.Now()
 			account, err := riotClient.GetAccountByRiotID(gameName, tagLine, player.Region)
+			metrics.RiotAPILatency.WithLabelValues("account").Observe(time.Since(apiStart).Seconds())
 			if err != nil {
+				metrics.RiotAPICallsTotal.WithLabelValues("account", "error").Inc()
+				metrics.PuuidBackfillTotal.WithLabelValues("error").Inc()
 				log.WarnContext(ctx, "puuid lookup failed", "username", player.Username, "error", err)
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
+			metrics.RiotAPICallsTotal.WithLabelValues("account", "success").Inc()
 			player.Puuid = sql.NullString{String: account.PUUID, Valid: true}
 			_, err = repo.UpsertPlayer(ctx, db.UpsertPlayerParams{
 				Username: player.Username,
@@ -131,27 +173,36 @@ func runRefresh(ctx context.Context, repo db.Repository, riotClient *riot.Direct
 				log.ErrorContext(ctx, "saving puuid", "username", player.Username, "error", err)
 				continue
 			}
+			metrics.PuuidBackfillTotal.WithLabelValues("success").Inc()
 			log.InfoContext(ctx, "backfilled puuid", "username", player.Username)
 			time.Sleep(100 * time.Millisecond)
 		}
 
+		apiStart := time.Now()
 		entries, err := riotClient.GetRankedEntries(player.Puuid.String, player.Region)
+		metrics.RiotAPILatency.WithLabelValues("ranked").Observe(time.Since(apiStart).Seconds())
 		if err != nil {
+			metrics.RiotAPICallsTotal.WithLabelValues("ranked", "error").Inc()
 			log.WarnContext(ctx, "fetching ranked entries", "username", player.Username, "error", err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
+		metrics.RiotAPICallsTotal.WithLabelValues("ranked", "success").Inc()
 
 		rank := extractSoloQueueRank(entries)
 
 		time.Sleep(100 * time.Millisecond)
 
+		apiStart = time.Now()
 		masteries, err := riotClient.GetTopChampionMastery(player.Puuid.String, player.Region, 3)
+		metrics.RiotAPILatency.WithLabelValues("mastery").Observe(time.Since(apiStart).Seconds())
 		if err != nil {
+			metrics.RiotAPICallsTotal.WithLabelValues("mastery", "error").Inc()
 			log.WarnContext(ctx, "fetching champion mastery", "username", player.Username, "error", err)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
+		metrics.RiotAPICallsTotal.WithLabelValues("mastery", "success").Inc()
 
 		champNames := make([]string, 0, len(masteries))
 		for _, m := range masteries {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/web/middleware"
 )
 
@@ -137,6 +138,12 @@ func (h *VoteHandler) Vote(w http.ResponseWriter, r *http.Request) {
 		h.log.ErrorContext(r.Context(), "processing vote", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
+	}
+
+	if req.Vote == 1 {
+		metrics.VotesTotal.WithLabelValues("up").Inc()
+	} else {
+		metrics.VotesTotal.WithLabelValues("down").Inc()
 	}
 
 	t, err := h.repo.GetPublicTranslation(r.Context(), translationID)

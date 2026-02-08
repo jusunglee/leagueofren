@@ -39,6 +39,7 @@ func (r *Router) Handler() http.Handler {
 	mux.Handle("GET /api/v1/translations",
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.List),
+			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
 			middleware.CacheControl("public, s-maxage=60, max-age=0"),
 		),
@@ -47,6 +48,7 @@ func (r *Router) Handler() http.Handler {
 	mux.Handle("GET /api/v1/translations/{id}",
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.Get),
+			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
 			middleware.CacheControl("public, s-maxage=60, max-age=0"),
 		),
@@ -55,6 +57,7 @@ func (r *Router) Handler() http.Handler {
 	mux.Handle("POST /api/v1/translations",
 		middleware.Chain(
 			http.HandlerFunc(translationHandler.Create),
+			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
 			middleware.RateLimit(rateLimiter),
 		),
@@ -63,6 +66,7 @@ func (r *Router) Handler() http.Handler {
 	mux.Handle("POST /api/v1/translations/{id}/vote",
 		middleware.Chain(
 			http.HandlerFunc(voteHandler.Vote),
+			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
 			middleware.RateLimit(rateLimiter),
 		),
@@ -71,6 +75,7 @@ func (r *Router) Handler() http.Handler {
 	mux.Handle("POST /api/v1/translations/{id}/feedback",
 		middleware.Chain(
 			http.HandlerFunc(feedbackHandler.Create),
+			middleware.PrometheusMetrics(),
 			middleware.RequestLogger(r.log),
 			middleware.RateLimit(rateLimiter),
 		),
