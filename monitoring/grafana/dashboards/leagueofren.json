@@ -325,7 +325,7 @@
       "title": "Web Server Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{service=\"web\"}", "refId": "A" }
+        { "expr": "{container=\"leagueofren-web-1\"}", "refId": "A" }
       ]
     },
     {
@@ -345,7 +345,7 @@
       "title": "Worker Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{service=\"worker\"}", "refId": "A" }
+        { "expr": "{container=\"leagueofren-worker-1\"}", "refId": "A" }
       ]
     },
     {
@@ -365,7 +365,7 @@
       "title": "Nginx Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{service=\"nginx\"}", "refId": "A" }
+        { "expr": "{container=\"leagueofren-nginx-1\"}", "refId": "A" }
       ]
     },
     {
