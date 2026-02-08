@@ -63,7 +63,7 @@ services:
     image: amir20/dozzle:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${TAILSCALE_IP:-127.0.0.1}:8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
@@ -71,7 +71,7 @@ services:
     image: prom/prometheus:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9091:9090"
+      - "${TAILSCALE_IP:-127.0.0.1}:9091:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -86,7 +86,7 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3000"
+      - "${TAILSCALE_IP:-127.0.0.1}:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
