@@ -325,7 +325,7 @@
       "title": "Web Server Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{container=~\"leagueofren-web-.*\"}", "refId": "A" }
+        { "expr": "{service=\"web\"}", "refId": "A" }
       ]
     },
     {
@@ -345,7 +345,7 @@
       "title": "Worker Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{container=~\"leagueofren-worker-.*\"}", "refId": "A" }
+        { "expr": "{service=\"worker\"}", "refId": "A" }
       ]
     },
     {
@@ -365,7 +365,7 @@
       "title": "Nginx Logs",
       "type": "logs",
       "targets": [
-        { "expr": "{container=~\"leagueofren-nginx-1\"}", "refId": "A" }
+        { "expr": "{service=\"nginx\"}", "refId": "A" }
       ]
     },
     {
@@ -385,7 +385,7 @@
       "title": "All Services (Errors)",
       "type": "logs",
       "targets": [
-        { "expr": "{container=~\"leagueofren-.*\"} |~ \"(?i)(error|fatal|panic)\"", "refId": "A" }
+        { "expr": "{job=\"docker\"} |~ \"(?i)(error|fatal|panic)\"", "refId": "A" }
       ]
     }
   ],
