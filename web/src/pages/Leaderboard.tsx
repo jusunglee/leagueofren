@@ -237,7 +237,7 @@ function buildLearnMoreUrl(username: string, translation: string, explanation: s
 }
 
 function buildOpggUrl(username: string, region: string) {
-  return `https://www.op.gg/summoners/${region.toLowerCase()}/${encodeURIComponent(username)}`
+  return `https://www.op.gg/summoners/${region.toLowerCase()}/${encodeURIComponent(username.replace('#', '-'))}`
 }
 
 function buildPorofessorUrl(username: string, region: string) {
@@ -309,12 +309,16 @@ function TranslationCard({ t, index, onVote, onFeedback, voteAnimation }: {
             <span className="text-sm leading-none" aria-hidden="true">{LANGUAGE_EMOJI[t.language] || '🌐'}</span>
             {t.language}
           </span>
-          {rank && RANK_ICON[rank] && (
+          {rank && RANK_ICON[rank] ? (
             <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
               <img src={RANK_ICON[rank]} alt="" className="w-4 h-4 object-contain" aria-hidden="true" />
               {rank}
             </span>
-          )}
+          ) : t.top_champions && t.top_champions.length > 0 ? (
+            <span className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1 text-[var(--foreground-muted)]">
+              UNRANKED
+            </span>
+          ) : null}
           {t.top_champions?.map(champ => (
             <span key={champ} className="mono-font text-xs px-2 py-0.5 bg-[var(--muted)] border-2 border-[var(--border-light)] rounded-[4px] tracking-widest uppercase inline-flex items-center gap-1">
               <span className="text-sm leading-none" aria-hidden="true">⚔️</span>

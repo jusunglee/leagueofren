@@ -257,24 +257,20 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate that this is a real Riot username
+	// Validate that this is a real Riot username (must include #tag)
 	gameName, tagLine, err := riot.ParseRiotID(req.Username)
 	if err != nil {
-		// Username might not have a tag — treat the whole thing as the game name
-		gameName = req.Username
-		tagLine = ""
+		writeError(w, http.StatusBadRequest, "username must include a tag (e.g. Player#NA1)")
+		return
 	}
 
-	var puuid string
-	if tagLine != "" {
-		account, err := h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
-		if err != nil {
-			h.log.WarnContext(r.Context(), "riot lookup failed", "gameName", gameName, "tagLine", tagLine, "region", req.Region, "error", err)
-			writeError(w, http.StatusBadRequest, "username not found on Riot servers")
-			return
-		}
-		puuid = account.PUUID
+	account, err := h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
+	if err != nil {
+		h.log.WarnContext(r.Context(), "riot lookup failed", "gameName", gameName, "tagLine", tagLine, "region", req.Region, "error", err)
+		writeError(w, http.StatusBadRequest, "username not found on Riot servers")
+		return
 	}
+	puuid := account.PUUID
 
 	// Server-side translation via LLM (ignores any client-provided translation)
 	translations, err := h.translator.TranslateUsernames(r.Context(), []string{gameName})
