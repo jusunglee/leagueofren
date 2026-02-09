@@ -373,8 +373,11 @@ func Run() (bool, error) {
 	return m.step == stepConfirm && m.err == nil, nil
 }
 
-// NeedsSetup checks if .env file exists
+// NeedsSetup checks if .env file exists and no config is provided via env vars.
 func NeedsSetup() bool {
+	if os.Getenv("DISCORD_TOKEN") != "" {
+		return false
+	}
 	_, err := os.Stat(".env")
 	return os.IsNotExist(err)
 }
