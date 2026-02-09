@@ -41,10 +41,7 @@ Located at `.githooks/pre-commit`. Runs selectively based on staged files:
 - `web/` files → `npx vite build --outDir ../cmd/web/dist --emptyOutDir` + `go build -o /dev/null ./cmd/web`
 
 ## Deployment
-
-- **Local/Droplet**: `make deploy` — builds Docker images and runs `docker compose -f docker-compose.prod.yml up -d`. Expects `.env` file in the repo root.
 - **Release**: `make release v=X.Y.Z` — tags and pushes, triggering GitHub Actions GoReleaser.
-- **Cloudflare**: Site is behind Cloudflare. After deploying, purge cache from the Cloudflare dashboard if changes aren't visible.
 
 ## Build Version
 
