@@ -13,6 +13,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jusunglee/leagueofren/internal/db"
+	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/samber/lo"
@@ -67,7 +68,6 @@ func New(
 }
 
 // TODO: Support ignore lists
-// TODO: metrics into grafana/lokiw
 // TODO: When https://github.com/golangci/golangci-lint/pull/6271 merges, enable exhaustruct and errcheck in golangci-lint
 
 func (b *Bot) Run(ctx context.Context, cancel context.CancelCauseFunc) error {
@@ -137,7 +137,9 @@ func (b *Bot) runProducer(ctx context.Context, ch chan<- sendMessageJob, wg *syn
 	defer close(ch)
 	for ctx.Err() == nil {
 		produceCtx, cancel := context.WithTimeout(ctx, b.config.EvaluateSubscriptionsTimeout)
+		cycleStart := time.Now()
 		jobs, err := b.produceTranslationMessages(produceCtx)
+		metrics.BotTranslationCycleDuration.Observe(time.Since(cycleStart).Seconds())
 		// Best effort send jobs even if there's an error, just make sure to log it
 		b.log.Info("produced jobs", slog.Int("num_jobs", len(jobs)))
 
@@ -329,6 +331,12 @@ func (b *Bot) handleCommand(s *discordgo.Session, i *discordgo.InteractionCreate
 	case "list":
 		result = b.handleListForChannel(i)
 	}
+
+	cmdResult := "success"
+	if result.Err != nil {
+		cmdResult = "error"
+	}
+	metrics.BotCommandsTotal.WithLabelValues(cmd, cmdResult).Inc()
 
 	b.respond(s, i, result.Response)
 
@@ -685,6 +693,7 @@ func (b *Bot) produceForServer(ctx context.Context, subs []db.Subscription) ([]s
 			if err != nil {
 				return nil
 			}
+			metrics.BotNamesTranslated.Add(float64(len(translations)))
 
 			jobs = append(jobs, sendMessageJob{
 				username:       sub.LolUsername,
@@ -747,6 +756,7 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 		return err
 	}
 
+	metrics.BotMessagesSent.Inc()
 	b.log.InfoContext(ctx, "sent and processed translation message",
 		"subscription_id", job.subscriptionID,
 		"channel_id", job.channelID,

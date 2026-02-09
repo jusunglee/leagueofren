@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/jusunglee/leagueofren/internal/logger"
 	"github.com/jusunglee/leagueofren/internal/riot"
 	"github.com/jusunglee/leagueofren/internal/translation"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 )
@@ -79,6 +81,7 @@ func mainE() error {
 		jobBufferSize                = fs.Int64Long("job-buffer-size", 20, "Buffer size for the job channel")
 		healthPort                   = fs.Int64Long("health-port", 8080, "Port for health check HTTP server")
 		websiteURL                   = fs.StringLong("website-url", "", "Companion website URL for submitting translations (empty to disable)")
+		grafanaHost                  = fs.StringLong("grafana-host", "", "Grafana host (enables Prometheus metrics server when set)")
 	)
 
 	if err := ff.Parse(fs, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -178,6 +181,21 @@ func mainE() error {
 	}()
 	defer healthServer.Shutdown(context.Background())
 	log.InfoContext(ctx, "health server started", "port", *healthPort)
+
+	// Metrics are only served when GRAFANA_HOST is set. Most users run the bot
+	// locally on Windows without a Prometheus/Grafana stack, so we skip the
+	// metrics server entirely to avoid confusion.
+	if *grafanaHost != "" {
+		go func() {
+			metricsMux := http.NewServeMux()
+			metricsMux.Handle("/metrics", promhttp.Handler())
+			metricsServer := &http.Server{Addr: ":9090", Handler: metricsMux}
+			log.InfoContext(ctx, "starting metrics server", "addr", ":9090")
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.ErrorContext(ctx, "metrics server error", "error", err)
+			}
+		}()
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

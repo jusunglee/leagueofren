@@ -76,6 +76,7 @@ services:
       LLM_MODEL: ${LLM_MODEL}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GRAFANA_HOST: grafana
 
   dozzle:
     image: amir20/dozzle:latest
@@ -99,6 +100,7 @@ services:
     depends_on:
       - web
       - worker
+      - bot
 
   grafana:
     image: grafana/grafana:latest

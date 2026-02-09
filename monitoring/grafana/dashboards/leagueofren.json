@@ -158,6 +158,51 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 108,
+      "title": "Discord Bot",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+      "id": 24,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Translation Cycle Duration",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(lor_bot_translation_cycle_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.50, rate(lor_bot_translation_cycle_duration_seconds_bucket[5m]))", "legendFormat": "p50", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+      "id": 25,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Bot Translation Activity",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(lor_bot_messages_sent_total[5m])", "legendFormat": "messages sent", "refId": "A" },
+        { "expr": "rate(lor_bot_names_translated_total[5m])", "legendFormat": "names translated", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "id": 26,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
+      "title": "Discord Commands",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (command, result) (rate(lor_bot_commands_total[5m]))", "legendFormat": "{{command}} {{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "id": 103,
       "title": "Worker",
       "type": "row"
@@ -165,7 +210,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
       "id": 11,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Worker Refresh Cycle Duration",
@@ -178,7 +223,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
       "id": 12,
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } },
       "title": "Riot API Calls",
@@ -190,7 +235,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
       "id": 13,
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } },
       "title": "Riot API Latency (p95)",
@@ -201,7 +246,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
       "id": 104,
       "title": "Database Pool",
       "type": "row"
@@ -209,7 +254,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 20, "spanNulls": false, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
       "id": 14,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "DB Connection Pool",
@@ -223,7 +268,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
       "id": 15,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "PUUID Backfill",
@@ -234,7 +279,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 49 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
       "id": 105,
       "title": "Nginx",
       "type": "row"
@@ -242,7 +287,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 50 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 59 },
       "id": 16,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Nginx Active Connections",
@@ -257,7 +302,7 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 50 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 59 },
       "id": 17,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Nginx Request Rate",
@@ -268,7 +313,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
       "id": 106,
       "title": "Go Runtime",
       "type": "row"
@@ -276,20 +321,21 @@
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 59 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 68 },
       "id": 18,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Goroutines",
       "type": "timeseries",
       "targets": [
         { "expr": "go_goroutines{job=\"web\"}", "legendFormat": "web", "refId": "A" },
-        { "expr": "go_goroutines{job=\"worker\"}", "legendFormat": "worker", "refId": "B" }
+        { "expr": "go_goroutines{job=\"worker\"}", "legendFormat": "worker", "refId": "B" },
+        { "expr": "go_goroutines{job=\"bot\"}", "legendFormat": "bot", "refId": "C" }
       ]
     },
     {
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": false } }, "overrides": [] },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 59 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 68 },
       "id": 19,
       "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Memory Usage",
@@ -298,19 +344,21 @@
         { "expr": "go_memstats_alloc_bytes{job=\"web\"}", "legendFormat": "web alloc", "refId": "A" },
         { "expr": "go_memstats_alloc_bytes{job=\"worker\"}", "legendFormat": "worker alloc", "refId": "B" },
         { "expr": "go_memstats_sys_bytes{job=\"web\"}", "legendFormat": "web sys", "refId": "C" },
-        { "expr": "go_memstats_sys_bytes{job=\"worker\"}", "legendFormat": "worker sys", "refId": "D" }
+        { "expr": "go_memstats_sys_bytes{job=\"worker\"}", "legendFormat": "worker sys", "refId": "D" },
+        { "expr": "go_memstats_alloc_bytes{job=\"bot\"}", "legendFormat": "bot alloc", "refId": "E" },
+        { "expr": "go_memstats_sys_bytes{job=\"bot\"}", "legendFormat": "bot sys", "refId": "F" }
       ]
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 67 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 76 },
       "id": 107,
       "title": "Logs",
       "type": "row"
     },
     {
       "datasource": { "type": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 77 },
       "id": 20,
       "options": {
         "showTime": true,
@@ -330,7 +378,7 @@
     },
     {
       "datasource": { "type": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 78 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 87 },
       "id": 21,
       "options": {
         "showTime": true,
@@ -350,7 +398,27 @@
     },
     {
       "datasource": { "type": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 88 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 97 },
+      "id": 27,
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "title": "Bot Logs",
+      "type": "logs",
+      "targets": [
+        { "expr": "{container=\"leagueofren-bot-1\"}", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 107 },
       "id": 22,
       "options": {
         "showTime": true,
@@ -370,7 +438,7 @@
     },
     {
       "datasource": { "type": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 98 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 117 },
       "id": 23,
       "options": {
         "showTime": true,

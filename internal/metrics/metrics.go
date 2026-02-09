@@ -70,6 +70,32 @@ var (
 	}, []string{"result"})
 )
 
+// Bot metrics. Only served when GRAFANA_HOST is set — most users run the bot
+// locally on Windows without a Prometheus/Grafana stack, so we don't start a
+// metrics server at all unless GRAFANA_HOST is provided.
+var (
+	BotTranslationCycleDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "lor_bot_translation_cycle_duration_seconds",
+		Help:    "Duration of each bot translation produce cycle",
+		Buckets: []float64{1, 5, 10, 30, 60, 120, 300},
+	})
+
+	BotMessagesSent = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "lor_bot_messages_sent_total",
+		Help: "Total Discord messages sent with translations",
+	})
+
+	BotNamesTranslated = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "lor_bot_names_translated_total",
+		Help: "Total individual foreign names translated by the bot",
+	})
+
+	BotCommandsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "lor_bot_commands_total",
+		Help: "Discord slash commands handled",
+	}, []string{"command", "result"})
+)
+
 // Database pool metrics (gauges updated periodically).
 var (
 	DBPoolTotalConns = promauto.NewGauge(prometheus.GaugeOpts{
