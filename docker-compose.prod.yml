@@ -59,6 +59,24 @@ services:
       RIOT_API_KEY: ${RIOT_API_KEY}
       INTERVAL: 1h
 
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/jusunglee/leagueofren/bot:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://leagueofren:${POSTGRES_PASSWORD}@postgres:5432/leagueofren?sslmode=disable
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      RIOT_API_KEY: ${RIOT_API_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      LLM_MODEL: ${LLM_MODEL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+
   dozzle:
     image: amir20/dozzle:latest
     restart: unless-stopped

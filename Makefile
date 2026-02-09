@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy deploy-local
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy-site deploy-bot deploy-site-local
 
 # Default target
 help:
@@ -20,8 +20,9 @@ help:
 	@echo "  make build-linux    - Build Linux binary"
 	@echo "  make build-darwin   - Build macOS binary"
 	@echo "  make release v=X.Y.Z - Tag and push a release"
-	@echo "  make deploy         - Wait for CI build, pull GHCR images, and restart"
-	@echo "  make deploy-local   - Build images locally and restart"
+	@echo "  make deploy-site    - Wait for CI, pull & restart site (web, worker, nginx)"
+	@echo "  make deploy-bot     - Wait for CI, pull & restart bot"
+	@echo "  make deploy-site-local - Build site images locally and restart"
 	@echo "  make clean          - Clean build artifacts"
 
 # Development setup
@@ -123,9 +124,8 @@ release:
 	git push origin main "v$(v)"
 	@echo "Released v$(v) — GitHub Actions will build the release."
 
-# Deploy by pulling pre-built images from GHCR (fast — no local build)
-# Waits for all workflow runs (CI + Docker) to pass for HEAD before pulling
-deploy:
+# Shared CI-wait logic (usage: $(call wait-ci))
+define wait-ci
 	@command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not found. Install it: https://cli.github.com"; exit 1; }
 	@gh auth status >/dev/null 2>&1 || { echo "Error: gh not authenticated. Run: gh auth login"; exit 1; }
 	@COMMIT=$$(git rev-parse HEAD); \
@@ -163,17 +163,29 @@ deploy:
 		fi; \
 		echo ""; \
 	done
-	docker compose -f docker-compose.prod.yml pull
-	docker compose -f docker-compose.prod.yml up -d
-	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
+endef
 
-# Deploy by building images locally (slow — use when GHCR images aren't ready)
-deploy-local:
+# Deploy site (web, worker, nginx) by pulling pre-built images from GHCR
+deploy-site:
+	$(call wait-ci)
+	docker compose -f docker-compose.prod.yml pull web worker nginx
+	docker compose -f docker-compose.prod.yml up -d web worker nginx
+	@echo "Site deployed. Use 'docker compose -f docker-compose.prod.yml logs -f web worker nginx' to follow logs."
+
+# Deploy bot by pulling pre-built image from GHCR
+deploy-bot:
+	$(call wait-ci)
+	docker compose -f docker-compose.prod.yml pull bot
+	docker compose -f docker-compose.prod.yml up -d bot
+	@echo "Bot deployed. Use 'docker compose -f docker-compose.prod.yml logs -f bot' to follow logs."
+
+# Deploy site by building images locally (slow — use when GHCR images aren't ready)
+deploy-site-local:
 	COMMIT_HASH=$$(git rev-parse --short HEAD) \
 	COMMIT_DATE=$$(git log -1 --format=%ci) \
-	docker compose -f docker-compose.prod.yml build
-	docker compose -f docker-compose.prod.yml up -d
-	@echo "Deployed. Use 'docker compose -f docker-compose.prod.yml logs -f' to follow logs."
+	docker compose -f docker-compose.prod.yml build web worker
+	docker compose -f docker-compose.prod.yml up -d web worker nginx
+	@echo "Site deployed. Use 'docker compose -f docker-compose.prod.yml logs -f web worker nginx' to follow logs."
 
 # Clean build artifacts
 clean:
