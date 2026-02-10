@@ -834,11 +834,11 @@ func TestHandleSubscribe(t *testing.T) {
 		}
 
 		mockRepo.On("CountSubscriptionsByServer", mock.Anything, "guild-123").
-			Return(int64(11), nil)
+			Return(int64(10), nil)
 
 		result := bot.handleSubscribe(interaction)
 		assert.NoError(t, result.Err)
-		assert.Contains(t, result.Response, "maxium subscription")
+		assert.Contains(t, result.Response, "maximum subscription")
 	})
 
 	t.Run("invalid riot account", func(t *testing.T) {

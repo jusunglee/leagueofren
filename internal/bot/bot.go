@@ -476,9 +476,15 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) handlerResult {
 	defer cancel()
 
 	count, err := b.repo.CountSubscriptionsByServer(ctx, serverID)
-	if count > b.config.MaxSubscriptionsPerServer {
+	if err != nil {
 		return handlerResult{
-			Response: "❌ Already at maxium subscription count per server, please /unsubscribe to some before subscribing to more.",
+			Response: "❌ Failed to check subscription count. Please try again later.",
+			Err:      fmt.Errorf("counting subscriptions for server %s: %w", serverID, err),
+		}
+	}
+	if count >= b.config.MaxSubscriptionsPerServer {
+		return handlerResult{
+			Response: "❌ Already at maximum subscription count per server, please /unsubscribe to some before subscribing to more.",
 		}
 	}
 
