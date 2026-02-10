@@ -29,38 +29,6 @@ A Discord bot that translates Korean and Chinese summoner names in League of Leg
 
 LeagueOfRen monitors League of Legends players and automatically translates non-English summoner names in their games. When a subscribed player starts a game, the bot detects Korean/Chinese character usernames and provides translations in the Discord channel using AI.
 
-### Name Origin
-
-The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean and Chinese characters meaning "person". I could never figure out the full underlying meanings of the names without looking them up (despite me being Korean), which inspired this bot.
-
-## Other languages
-
-In theory, this is language-scalable but I started this project scoped down since 99% of foreign names I saw in NA were chinese and korean (I also live in NYC so I might just be region-scoped with a larger Asian population). In addition, the value of this feature rests entirely on the robustness and accuracy of the translations from the LLMs. Due to, what I think to be, a cultural phenomenon unique to Korean/Chinese communities where there's a gold mine of online content produced in their respective languages about league to provide enough context to LLM scrapers, I think these 2 languages specifically are well suited perhaps next to English to be potential language candidates for this project. I wonder if to support other languages, we'd have to use an intelligent model adapter based on the language.
-
-## Why Discord
-We use Discord instead of just `/msg` -ing you in-game because it's, for good reason, not supported by the official riot server API. There's future plans to do this anyways with the game client API if enough people just want to deploy this locally, since you'll just be whispering to yourself and has gutted potential for abuse.
-
-## Features
-
-- **Subscribe to Players**: Track specific League of Legends usernames by region
-- **Automatic Detection**: Monitors when subscribed players enter games
-- **Smart Translation**: Uses AI (Claude Sonnet or Google Gemma) to translate Korean/Chinese usernames with context
-- **Translation Caching**: Stores translations in PostgreSQL to reduce API costs
-- **Riot API Caching**: Caches account lookups (24h) and game status (2min) to respect rate limits
-- **Status Tracking**: Records each check with status (OFFLINE, NEW_TRANSLATIONS, etc.)
-
-## Tech Stack
-
-- **Language**: Go 1.26
-- **Database**: SQLite (standalone) or PostgreSQL 16 (development/production)
-- **Schema Management**: [Atlas](https://atlasgo.io/) (declarative migrations)
-- **Discord**: WebSocket Gateway ([discordgo](https://github.com/bwmarrin/discordgo))
-- **APIs**: Riot Games API, Anthropic API, Google AI API
-- **Code Generation**: [sqlc](https://sqlc.dev/) (type-safe SQL)
-- **TUI**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (first-run setup wizard)
-- **Releases**: [GoReleaser](https://goreleaser.com/) + GitHub Actions
-- **Deployment**: Railway, Docker, or standalone binary
-
 ## Quick Start
 
 ### Option A: Windows Users (Just Run It)
@@ -164,6 +132,39 @@ make schema-apply # Apply database schema
 make run
 ```
 
+
+### Name Origin
+
+The name comes from seeing 인 (in) and 人 (ren) frequently in games - Korean and Chinese characters meaning "person". I could never figure out the full underlying meanings of the names without looking them up (despite me being Korean), which inspired this bot.
+
+## Other languages
+
+In theory, this is language-scalable but I started this project scoped down since 99% of foreign names I saw in NA were chinese and korean (I also live in NYC so I might just be region-scoped with a larger Asian population). In addition, the value of this feature rests entirely on the robustness and accuracy of the translations from the LLMs. Due to, what I think to be, a cultural phenomenon unique to Korean/Chinese communities where there's a gold mine of online content produced in their respective languages about league to provide enough context to LLM scrapers, I think these 2 languages specifically are well suited perhaps next to English to be potential language candidates for this project. I wonder if to support other languages, we'd have to use an intelligent model adapter based on the language.
+
+## Why Discord
+We use Discord instead of just `/msg` -ing you in-game because it's, for good reason, not supported by the official riot server API. There's future plans to do this anyways with the game client API if enough people just want to deploy this locally, since you'll just be whispering to yourself and has gutted potential for abuse.
+
+## Features
+
+- **Subscribe to Players**: Track specific League of Legends usernames by region
+- **Automatic Detection**: Monitors when subscribed players enter games
+- **Smart Translation**: Uses AI (Claude Sonnet or Google Gemma) to translate Korean/Chinese usernames with context
+- **Translation Caching**: Stores translations in PostgreSQL to reduce API costs
+- **Riot API Caching**: Caches account lookups (24h) and game status (2min) to respect rate limits
+- **Status Tracking**: Records each check with status (OFFLINE, NEW_TRANSLATIONS, etc.)
+
+## Tech Stack
+
+- **Language**: Go 1.26
+- **Database**: SQLite (standalone) or PostgreSQL 16 (development/production)
+- **Schema Management**: [Atlas](https://atlasgo.io/) (declarative migrations)
+- **Discord**: WebSocket Gateway ([discordgo](https://github.com/bwmarrin/discordgo))
+- **APIs**: Riot Games API, Anthropic API, Google AI API
+- **Code Generation**: [sqlc](https://sqlc.dev/) (type-safe SQL)
+- **TUI**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (first-run setup wizard)
+- **Releases**: [GoReleaser](https://goreleaser.com/) + GitHub Actions
+- **Deployment**: Docker, or standalone binary
+
 ## Development Commands
 
 ```bash
@@ -260,23 +261,83 @@ Users who run `/subscribe` or `/unsubscribe` must have the **Manage Channels** p
 
 Supported regions: NA, EUW, EUNE, KR, JP, BR, LAN, LAS, OCE, TR, RU
 
-## Deployment (Railway)
+## Deployment
 
-```bash
-# 1. Create Railway project and add PostgreSQL
-railway init
-railway add postgresql
+I deployed everything on a digital ocean droplet because I hate usage based pricing. You can deploy this on any box, and more ux friendly dev platforms like railway might just read and handle the docker files for you but I haven't tested it out.
 
-# 2. Set environment variables
-railway variables set DISCORD_TOKEN=xxx
-railway variables set RIOT_API_KEY=xxx
-railway variables set ANTHROPIC_API_KEY=xxx
+### Droplet instructions
+1. Clone the repo
+2. Run `gh auth`
+3. Run `make deploy`, which will prompt you to set up some env vars before running.
 
-# 3. Deploy
-railway up
+
+## Observability
+
+The production stack includes a full monitoring setup deployed alongside the application via `docker-compose.prod.yml`.
+
+### Stack
+
+- **Prometheus** — scrapes metrics from the web server, worker, and nginx every 15s. 15-day retention.
+- **Loki** — aggregates logs from all Docker containers via Promtail. 15-day retention.
+- **Grafana** — visualizes everything through a pre-provisioned "League of Ren" dashboard.
+- **Dozzle** — lightweight Docker log viewer for quick container log browsing.
+
+### Accessing Grafana
+
+I access grafana on the droplet via tailscale, you can choose to host + auth it if you wish if you'd rather expose it to the internet.
+
+```
+http://GRAFANA_HOST:3001
 ```
 
-Railway auto-detects the Dockerfile and injects `DATABASE_URL`.
+Login with `admin` / the value of `GRAFANA_PASSWORD` in your `.env` (defaults to `admin`).
+
+### Dashboard
+
+The provisioned dashboard auto-refreshes every 30s and includes:
+
+- **Service Health** — uptime, request rate, error rate
+- **HTTP Traffic** — request rate by route, p95 latency, status code breakdown, rate limit hits
+- **Translations & Votes** — submission counts, vote activity, LLM latency
+- **Worker** — refresh cycle duration, Riot API calls/latency, PUUID backfill progress
+- **Database Pool** — connection pool utilization
+- **Nginx** — active connections, request throughput
+- **Go Runtime** — goroutine count, memory usage
+- **Logs** — web, worker, and nginx logs with error aggregation (via Loki)
+
+### Application Metrics
+
+Custom Prometheus metrics are defined in `internal/metrics/metrics.go`:
+
+| Metric | Description |
+|--------|-------------|
+| `lor_http_requests_total` | HTTP requests by route/method/status |
+| `lor_http_request_duration_seconds` | Request latency histogram |
+| `lor_rate_limit_hits_total` | Rate limit rejections |
+| `lor_translation_submissions_total` | Translation submissions |
+| `lor_votes_total` | Votes by direction |
+| `lor_llm_translation_duration_seconds` | LLM API latency |
+| `lor_worker_refresh_duration_seconds` | Worker refresh cycle time |
+| `lor_riot_api_calls_total` | Riot API calls by endpoint/result |
+| `lor_riot_api_duration_seconds` | Riot API latency |
+| `lor_db_pool_*` | Database connection pool stats |
+
+### Config Files
+
+All monitoring config lives in `monitoring/`:
+
+```
+monitoring/
+├── prometheus.yml                          # Prometheus scrape config
+├── loki.yml                                # Loki storage/retention config
+├── promtail.yml                            # Promtail → Loki log pipeline
+└── grafana/
+    ├── provisioning/
+    │   ├── datasources/prometheus.yml      # Prometheus + Loki data sources
+    │   └── dashboards/dashboards.yml       # Dashboard provisioning
+    └── dashboards/
+        └── leagueofren.json               # The pre-built dashboard
+```
 
 ## Project Structure
 
