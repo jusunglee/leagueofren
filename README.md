@@ -318,4 +318,8 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Responsible AI Disclosure
 
-I leaned on Claude quite heavily here, but I would stop short of calling this "vibe-coded". I came up with the initial plan in [initial_plan.md](initial_plan.md) and implemented this with prompts progressively by driving the technical direction myself. You can see my entire prompt history in [claude_history.txt](claude_history.txt).
+## Website
+The website was 100% vibecoded. I'm not trying to spend hours figuring our which value of strokelinejoin to use.
+
+## Bot
+I leaned on Claude quite heavily here, but I would stop short of calling this "vibe-coded". I came up with the initial plan in [initial_plan.md](initial_plan.md) and implemented this with prompts progressively by driving the technical direction myself. You can see my entire prompt history in [claude_history.txt](claude_history.txt). I implemented the main evaluation loop by hand without AI (for fun), you can check out the commit history for the details.
