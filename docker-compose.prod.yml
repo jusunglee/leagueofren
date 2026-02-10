@@ -77,6 +77,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       GRAFANA_HOST: grafana
+      WEBSITE_URL: http://web:3000
 
   dozzle:
     image: amir20/dozzle:latest
