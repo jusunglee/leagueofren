@@ -1,31 +1,30 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"math"
 	"net/http"
 	"strconv"
 	"time"
-	"unicode"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jusunglee/leagueofren/internal/db"
-	"github.com/jusunglee/leagueofren/internal/metrics"
 	"github.com/jusunglee/leagueofren/internal/riot"
-	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/jusunglee/leagueofren/internal/transliteration"
+	"github.com/jusunglee/leagueofren/internal/jobs"
+	"github.com/riverqueue/river"
 )
 
 type TranslationHandler struct {
-	repo       db.Repository
-	log        *slog.Logger
-	riot       *riot.DirectClient
-	translator *translation.Translator
+	repo        db.Repository
+	log         *slog.Logger
+	riot        *riot.DirectClient
+	riverClient *river.Client[pgx.Tx]
 }
 
-func NewTranslationHandler(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, translator *translation.Translator) *TranslationHandler {
-	return &TranslationHandler{repo: repo, log: log, riot: riotClient, translator: translator}
+func NewTranslationHandler(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx]) *TranslationHandler {
+	return &TranslationHandler{repo: repo, log: log, riot: riotClient, riverClient: riverClient}
 }
 
 type translationResponse struct {
@@ -268,73 +267,27 @@ func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
+	// Validate via Riot API before enqueueing (fast, prevents garbage jobs)
+	_, err = h.riot.GetAccountByRiotID(gameName, tagLine, req.Region)
 	if err != nil {
 		h.log.WarnContext(r.Context(), "riot lookup failed", "gameName", gameName, "tagLine", tagLine, "region", req.Region, "error", err)
 		writeError(w, http.StatusBadRequest, "username not found on Riot servers")
 		return
 	}
-	puuid := account.PUUID
 
-	// Server-side translation via LLM (ignores any client-provided translation)
-	llmStart := time.Now()
-	translations, err := h.translator.TranslateUsernames(r.Context(), []string{gameName})
-	metrics.LLMTranslationDuration.Observe(time.Since(llmStart).Seconds())
-	if err != nil || len(translations) == 0 {
-		metrics.TranslationSubmissions.WithLabelValues("failed").Inc()
-		h.log.WarnContext(r.Context(), "translation failed", "username", req.Username, "error", err)
-		writeError(w, http.StatusInternalServerError, "translation failed")
-		return
-	}
-
-	t := translations[0]
-	language := detectLanguageFromName(gameName)
-
-	var result db.PublicTranslation
-	err = h.repo.WithTx(r.Context(), func(txRepo db.Repository) error {
-		_, err := txRepo.UpsertPlayer(r.Context(), db.UpsertPlayerParams{
-			Username: req.Username,
-			Region:   req.Region,
-			Puuid:    sql.NullString{String: puuid, Valid: puuid != ""},
-		})
-		if err != nil {
-			return err
-		}
-
-		params := db.UpsertPublicTranslationParams{
-			Username:       req.Username,
-			Translation:    t.Translated,
-			Language:       language,
-			PlayerUsername: req.Username,
-			RiotVerified:   tagLine != "",
-		}
-		if t.Explanation != "" {
-			params.Explanation = sql.NullString{String: t.Explanation, Valid: true}
-		}
-
-		result, err = txRepo.UpsertPublicTranslation(r.Context(), params)
-		return err
-	})
+	// Enqueue translation job for async processing
+	_, err = h.riverClient.Insert(r.Context(), jobs.TranslateUsernameArgs{
+		Username: req.Username,
+		Region:   req.Region,
+	}, nil)
 	if err != nil {
-		metrics.TranslationSubmissions.WithLabelValues("failed").Inc()
-		h.log.ErrorContext(r.Context(), "upserting translation", "error", err)
+		h.log.ErrorContext(r.Context(), "enqueuing translation job", "username", req.Username, "error", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	metrics.TranslationSubmissions.WithLabelValues("success").Inc()
-	result.Region = req.Region
-
-	writeJSON(w, http.StatusCreated, toTranslationResponse(result))
-}
-
-func detectLanguageFromName(name string) string {
-	for _, r := range name {
-		if unicode.Is(unicode.Hangul, r) {
-			return "korean"
-		}
-	}
-	return "chinese"
+	h.log.InfoContext(r.Context(), "translation job enqueued", "username", req.Username, "region", req.Region)
+	writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued"})
 }
 
 func periodCutoff(period string) time.Time {

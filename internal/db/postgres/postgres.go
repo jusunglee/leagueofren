@@ -58,6 +58,11 @@ func (r *Repository) PoolStats() *pgxpool.Stat {
 	return r.pool.Stat()
 }
 
+// Pool returns the underlying pgxpool.Pool for use by River job queue.
+func (r *Repository) Pool() *pgxpool.Pool {
+	return r.pool
+}
+
 func (r *Repository) WithTx(ctx context.Context, fn func(repo db.Repository) error) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

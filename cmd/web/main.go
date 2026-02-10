@@ -27,6 +27,9 @@ import (
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 )
 
 //go:embed all:dist
@@ -120,7 +123,38 @@ func mainE() error {
 	riotClient := riot.NewDirectClient(*riotAPIKey)
 	translator := translation.NewTranslator(llmClient, repo, *llmProvider, *llmModel)
 
-	router := web.NewRouter(repo, log, riotClient, translator)
+	// River job queue setup
+	riverDriver := riverpgxv5.New(repo.Pool())
+
+	// Run River migrations
+	migrator, err := rivermigrate.New(riverDriver, nil)
+	if err != nil {
+		return fmt.Errorf("creating river migrator: %w", err)
+	}
+	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
+	if err != nil {
+		return fmt.Errorf("running river migrations: %w", err)
+	}
+
+	workers := river.NewWorkers()
+	river.AddWorker(workers, web.NewTranslateWorker(repo, riotClient, translator, log))
+
+	riverClient, err := river.NewClient(riverDriver, &river.Config{
+		Logger: log,
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 2},
+		},
+		Workers: workers,
+	})
+	if err != nil {
+		return fmt.Errorf("creating river client: %w", err)
+	}
+
+	if err := riverClient.Start(ctx); err != nil {
+		return fmt.Errorf("starting river client: %w", err)
+	}
+
+	router := web.NewRouter(repo, log, riotClient, riverClient)
 	apiHandler := router.Handler()
 
 	// Serve API routes first, fall back to embedded static files for the SPA
@@ -188,6 +222,13 @@ func mainE() error {
 	log.InfoContext(ctx, "starting web server", "port", *port)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server error: %w", err)
+	}
+
+	// Gracefully stop River (finish in-flight jobs)
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer stopCancel()
+	if err := riverClient.Stop(stopCtx); err != nil {
+		log.Error("river client stop error", "error", err)
 	}
 
 	return nil

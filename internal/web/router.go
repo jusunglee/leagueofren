@@ -4,33 +4,34 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jusunglee/leagueofren/internal/db"
 	"github.com/jusunglee/leagueofren/internal/riot"
-	"github.com/jusunglee/leagueofren/internal/translation"
 	"github.com/jusunglee/leagueofren/internal/web/handlers"
 	"github.com/jusunglee/leagueofren/internal/web/middleware"
+	"github.com/riverqueue/river"
 )
 
 type Router struct {
-	repo       db.Repository
-	log        *slog.Logger
-	riot       *riot.DirectClient
-	translator *translation.Translator
+	repo        db.Repository
+	log         *slog.Logger
+	riot        *riot.DirectClient
+	riverClient *river.Client[pgx.Tx]
 }
 
-func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, translator *translation.Translator) *Router {
+func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx]) *Router {
 	return &Router{
-		repo:       repo,
-		log:        log,
-		riot:       riotClient,
-		translator: translator,
+		repo:        repo,
+		log:         log,
+		riot:        riotClient,
+		riverClient: riverClient,
 	}
 }
 
 func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	translationHandler := handlers.NewTranslationHandler(r.repo, r.log, r.riot, r.translator)
+	translationHandler := handlers.NewTranslationHandler(r.repo, r.log, r.riot, r.riverClient)
 	voteHandler := handlers.NewVoteHandler(r.repo, r.log)
 	feedbackHandler := handlers.NewFeedbackHandler(r.repo, r.log)
 
