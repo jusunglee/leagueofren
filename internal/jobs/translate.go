@@ -19,8 +19,10 @@ func (args TranslateUsernameArgs) InsertOpts() river.InsertOpts {
 			ByArgs: true,
 			ByState: []rivertype.JobState{
 				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
 				rivertype.JobStateRunning,
 				rivertype.JobStateRetryable,
+				rivertype.JobStateScheduled,
 			},
 		},
 		MaxAttempts: 3,
