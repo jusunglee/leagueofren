@@ -120,14 +120,20 @@ func (h *TranslationHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * limit
 
-	total, err := h.repo.CountPublicTranslations(r.Context(), db.CountPublicTranslationsParams{
-		Region:   region,
-		Language: language,
-	})
-	if err != nil {
-		h.log.ErrorContext(r.Context(), "counting translations", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
+	var (
+		total int64
+		err   error
+	)
+	if sort != "hot" {
+		total, err = h.repo.CountPublicTranslations(r.Context(), db.CountPublicTranslationsParams{
+			Region:   region,
+			Language: language,
+		})
+		if err != nil {
+			h.log.ErrorContext(r.Context(), "counting translations", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
 	}
 
 	var translations []db.PublicTranslation
@@ -143,7 +149,7 @@ func (h *TranslationHandler) List(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: cutoff,
 		})
 	case "hot":
-		// Fetch from "new" and sort by hot score in Go
+		// Fetch recent translations and sort by hot score in Go, always return top 10
 		translations, err = h.repo.ListPublicTranslationsNew(r.Context(), db.ListPublicTranslationsNewParams{
 			Region:   region,
 			Language: language,
@@ -190,15 +196,11 @@ func (h *TranslationHandler) List(w http.ResponseWriter, r *http.Request) {
 			items[j+1] = key
 		}
 
-		start := offset
-		end := offset + limit
-		if start > len(items) {
-			start = len(items)
-		}
+		end := 10
 		if end > len(items) {
 			end = len(items)
 		}
-		for _, item := range items[start:end] {
+		for _, item := range items[:end] {
 			data = append(data, item.resp)
 		}
 	} else {
@@ -211,13 +213,24 @@ func (h *TranslationHandler) List(w http.ResponseWriter, r *http.Request) {
 		data = []translationResponse{}
 	}
 
-	writeJSON(w, http.StatusOK, listResponse{
-		Data: data,
-		Pagination: paginationMeta{
+	var pagination paginationMeta
+	if sort == "hot" {
+		pagination = paginationMeta{
+			Page:  1,
+			Limit: 10,
+			Total: int64(len(data)),
+		}
+	} else {
+		pagination = paginationMeta{
 			Page:  page,
 			Limit: limit,
 			Total: total,
-		},
+		}
+	}
+
+	writeJSON(w, http.StatusOK, listResponse{
+		Data:       data,
+		Pagination: pagination,
 	})
 }
 
