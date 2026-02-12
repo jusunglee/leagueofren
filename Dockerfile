@@ -19,15 +19,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bot ./cmd/bot
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates && \
+    addgroup -g 1000 appuser && adduser -u 1000 -D -G appuser appuser
 
-WORKDIR /root/
+WORKDIR /home/appuser
 
 # Copy the binary from builder
 COPY --from=builder /app/bot .
 
 # Copy migrations (needed for production deployments)
 COPY --from=builder /app/migrations ./migrations
+
+USER appuser
 
 EXPOSE 8080
 

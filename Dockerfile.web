@@ -22,8 +22,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/web
 
 # Stage 3: Minimal runtime
 FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
+RUN apk --no-cache add ca-certificates && \
+    addgroup -g 1000 appuser && adduser -u 1000 -D -G appuser appuser
+WORKDIR /home/appuser
 COPY --from=builder /app/server .
+USER appuser
 EXPOSE 3000
 CMD ["./server"]
