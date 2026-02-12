@@ -16,23 +16,16 @@ import (
 	"github.com/jusunglee/leagueofren/internal/web/middleware"
 )
 
-const (
-	visitorCookieName = "lor_visitor"
-	// Vote uniqueness is per browser (cookie), not per IP. This is because multiple
-	// users can share an IP due to NAT (e.g. a LAN party, office, university dorm).
-	// With IP-only uniqueness, an entire household would be limited to one vote per
-	// translation. Instead, we use a random UUID cookie as the visitor fingerprint,
-	// with a per-IP cap of 10 votes as an abuse backstop.
-	maxVotesPerIP = 10
-)
+const visitorCookieName = "lor_visitor"
 
 type VoteHandler struct {
-	repo db.Repository
-	log  *slog.Logger
+	repo          db.Repository
+	log           *slog.Logger
+	maxVotesPerIP int
 }
 
-func NewVoteHandler(repo db.Repository, log *slog.Logger) *VoteHandler {
-	return &VoteHandler{repo: repo, log: log}
+func NewVoteHandler(repo db.Repository, log *slog.Logger, maxVotesPerIP int) *VoteHandler {
+	return &VoteHandler{repo: repo, log: log, maxVotesPerIP: maxVotesPerIP}
 }
 
 type voteRequest struct {
@@ -73,7 +66,7 @@ func (h *VoteHandler) Vote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	if ipCount >= maxVotesPerIP {
+	if int(ipCount) >= h.maxVotesPerIP {
 		writeError(w, http.StatusTooManyRequests, "too many votes from this network")
 		return
 	}

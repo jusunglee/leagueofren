@@ -12,21 +12,29 @@ import (
 	"github.com/riverqueue/river"
 )
 
+type RateLimitConfig struct {
+	Max           int
+	WindowSeconds int
+	MaxVotesPerIP int
+}
+
 type Router struct {
 	repo           db.Repository
 	log            *slog.Logger
 	riot           *riot.DirectClient
 	riverClient    *river.Client[pgx.Tx]
 	allowedOrigins []string
+	rateLimit      RateLimitConfig
 }
 
-func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx], allowedOrigins []string) *Router {
+func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx], allowedOrigins []string, rateLimit RateLimitConfig) *Router {
 	return &Router{
 		repo:           repo,
 		log:            log,
 		riot:           riotClient,
 		riverClient:    riverClient,
 		allowedOrigins: allowedOrigins,
+		rateLimit:      rateLimit,
 	}
 }
 
@@ -34,10 +42,10 @@ func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	translationHandler := handlers.NewTranslationHandler(r.repo, r.log, r.riot, r.riverClient)
-	voteHandler := handlers.NewVoteHandler(r.repo, r.log)
+	voteHandler := handlers.NewVoteHandler(r.repo, r.log, r.rateLimit.MaxVotesPerIP)
 	feedbackHandler := handlers.NewFeedbackHandler(r.repo, r.log)
 
-	rateLimiter := middleware.NewRateLimiter(30, 60)
+	rateLimiter := middleware.NewRateLimiter(r.rateLimit.Max, r.rateLimit.WindowSeconds)
 
 	mux.Handle("GET /api/v1/translations",
 		middleware.Chain(

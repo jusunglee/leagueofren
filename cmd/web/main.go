@@ -57,6 +57,9 @@ func mainE() error {
 		anthropicAPIKey = fs_.StringLong("anthropic-api-key", "", "Anthropic API key")
 		googleAPIKey    = fs_.StringLong("google-api-key", "", "Google API key")
 		allowedOrigins  = fs_.StringLong("allowed-origins", "", "Comma-separated list of allowed CORS origins")
+		rateLimitMax    = fs_.IntLong("rate-limit-max", 60, "Max requests per rate limit window per IP")
+		rateLimitWindow = fs_.IntLong("rate-limit-window", 60, "Rate limit window in seconds")
+		maxVotesPerIP   = fs_.IntLong("max-votes-per-ip", 20, "Max votes allowed per IP per day")
 	)
 
 	if err := ff.Parse(fs_, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -164,7 +167,11 @@ func mainE() error {
 		}
 	}
 
-	router := web.NewRouter(repo, log, riotClient, riverClient, origins)
+	router := web.NewRouter(repo, log, riotClient, riverClient, origins, web.RateLimitConfig{
+		Max:           *rateLimitMax,
+		WindowSeconds: *rateLimitWindow,
+		MaxVotesPerIP: *maxVotesPerIP,
+	})
 	apiHandler := router.Handler()
 
 	// Serve API routes first, fall back to embedded static files for the SPA
