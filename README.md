@@ -33,6 +33,12 @@ LeagueOfRen monitors League of Legends players and automatically translates non-
 
 ## Quick Start
 
+### Try the Live Bot
+
+If you'd like to quickly try a live version, [add the bot to your server](https://discord.com/oauth2/authorize?client_id=1468642620514238597&permissions=2147485696&scope=bot+applications.commands). It's limited to one subscription per server and automatically submits found names to [leagueofren.com](https://leagueofren.com).
+
+---
+
 ### Option A: Windows Users (Just Run It)
 
 If you're on Windows and don't want to compile anything:
