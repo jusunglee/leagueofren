@@ -177,6 +177,7 @@ func getOrSetVisitorCookie(w http.ResponseWriter, r *http.Request) string {
 		Path:     "/",
 		MaxAge:   365 * 24 * 60 * 60,
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 	return id
