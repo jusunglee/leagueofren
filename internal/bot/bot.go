@@ -67,6 +67,22 @@ func New(
 	}
 }
 
+// RunOnce runs a single produce/consume cycle without opening a Discord WebSocket.
+// Useful for E2E testing where the bot token may already have an active gateway connection.
+func (b *Bot) RunOnce(ctx context.Context) error {
+	jobs, err := b.produceTranslationMessages(ctx)
+	b.log.InfoContext(ctx, "RunOnce produced", "jobs", len(jobs), "error", err)
+	if err != nil && len(jobs) == 0 {
+		return fmt.Errorf("producing: %w", err)
+	}
+	for _, job := range jobs {
+		if err := b.consumeTranslationMessages(ctx, job); err != nil {
+			return fmt.Errorf("consuming: %w", err)
+		}
+	}
+	return nil
+}
+
 // TODO: Support ignore lists
 // TODO: When https://github.com/golangci/golangci-lint/pull/6271 merges, enable exhaustruct and errcheck in golangci-lint
 
@@ -465,6 +481,63 @@ func getOption(options []*discordgo.ApplicationCommandInteractionDataOption, nam
 	return ""
 }
 
+// Subscribe validates a Riot ID, verifies the summoner via Riot API, and creates a DB subscription.
+func (b *Bot) Subscribe(ctx context.Context, channelID, username, region, serverID string) (db.Subscription, error) {
+	gameName, tagLine, err := riot.ParseRiotID(username)
+	if err != nil {
+		return db.Subscription{}, fmt.Errorf("invalid riot id: %w", err)
+	}
+
+	if !riot.IsValidRegion(region) {
+		return db.Subscription{}, fmt.Errorf("invalid region: %s", region)
+	}
+
+	account, err := b.riotClient.GetAccountByRiotID(ctx, gameName, tagLine, region)
+	if err != nil {
+		return db.Subscription{}, fmt.Errorf("verifying summoner: %w", err)
+	}
+
+	canonicalName := fmt.Sprintf("%s#%s", account.GameName, account.TagLine)
+
+	sub, err := b.repo.CreateSubscription(ctx, db.CreateSubscriptionParams{
+		DiscordChannelID: channelID,
+		LolUsername:      canonicalName,
+		Region:           region,
+		ServerID:         serverID,
+	})
+	if err != nil {
+		return db.Subscription{}, fmt.Errorf("creating subscription: %w", err)
+	}
+
+	b.log.InfoContext(ctx, "subscription created", "username", canonicalName, "region", region, "channel_id", channelID)
+	return sub, nil
+}
+
+// Unsubscribe validates a Riot ID and deletes the subscription.
+func (b *Bot) Unsubscribe(ctx context.Context, channelID, username, region string) error {
+	gameName, tagLine, err := riot.ParseRiotID(username)
+	if err != nil {
+		return fmt.Errorf("invalid riot id: %w", err)
+	}
+
+	canonicalName := fmt.Sprintf("%s#%s", gameName, tagLine)
+
+	rowsAffected, err := b.repo.DeleteSubscription(ctx, db.DeleteSubscriptionParams{
+		DiscordChannelID: channelID,
+		LolUsername:      canonicalName,
+		Region:           region,
+	})
+	if err != nil {
+		return fmt.Errorf("deleting subscription: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("subscription not found: %s in %s", canonicalName, region)
+	}
+
+	b.log.InfoContext(ctx, "subscription deleted", "username", canonicalName, "region", region, "channel_id", channelID)
+	return nil
+}
+
 func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) handlerResult {
 	options := i.ApplicationCommandData().Options
 	username := getOption(options, "username")
@@ -488,58 +561,27 @@ func (b *Bot) handleSubscribe(i *discordgo.InteractionCreate) handlerResult {
 		}
 	}
 
-	gameName, tagLine, err := riot.ParseRiotID(username)
+	_, err = b.Subscribe(ctx, channelID, username, region, serverID)
 	if err != nil {
-		return handlerResult{
-			Response: "❌ Invalid Riot ID format. Use `name#tag` (e.g., `Faker#KR1`)",
-			Err:      newUserError(err),
+		if errors.Is(err, riot.ErrNotFound) {
+			return handlerResult{
+				Response: fmt.Sprintf("❌ Summoner **%s** not found in **%s**", username, region),
+				Err:      newUserError(err),
+			}
 		}
-	}
-
-	if !riot.IsValidRegion(region) {
-		return handlerResult{
-			Response: fmt.Sprintf("❌ Invalid region: %s", region),
-			Err:      newUserError(fmt.Errorf("invalid region: %s", region)),
+		if db.IsNoRows(err) {
+			return handlerResult{
+				Response: fmt.Sprintf("⚠️ Already subscribed to **%s** (%s)", username, region),
+				Err:      newUserError(err),
+			}
 		}
-	}
-
-	account, err := b.riotClient.GetAccountByRiotID(ctx, gameName, tagLine, region)
-	if errors.Is(err, riot.ErrNotFound) {
-		return handlerResult{
-			Response: fmt.Sprintf("❌ Summoner **%s#%s** not found in **%s**", gameName, tagLine, region),
-			Err:      newUserError(err),
-		}
-	}
-	if err != nil {
-		return handlerResult{
-			Response: "❌ Failed to verify summoner. Please try again later.",
-			Err:      fmt.Errorf("verify summoner %s in %s: %w", username, region, err),
-		}
-	}
-
-	canonicalName := fmt.Sprintf("%s#%s", account.GameName, account.TagLine)
-
-	_, err = b.repo.CreateSubscription(ctx, db.CreateSubscriptionParams{
-		DiscordChannelID: channelID,
-		LolUsername:      canonicalName,
-		Region:           region,
-		ServerID:         serverID,
-	})
-	if db.IsNoRows(err) {
-		return handlerResult{
-			Response: fmt.Sprintf("⚠️ Already subscribed to **%s** (%s)", canonicalName, region),
-			Err:      newUserError(err),
-		}
-	}
-	if err != nil {
 		return handlerResult{
 			Response: "❌ Failed to subscribe. Please try again later.",
-			Err:      fmt.Errorf("create subscription for %s in %s: %w", canonicalName, region, err),
+			Err:      err,
 		}
 	}
 
-	b.log.InfoContext(ctx, "subscription created", "username", canonicalName, "region", region, "channel_id", channelID)
-	return handlerResult{Response: fmt.Sprintf("✅ Subscribed to **%s** (%s)! Will autounsubscribe after 3 weeks of no gameplay.", canonicalName, region)}
+	return handlerResult{Response: fmt.Sprintf("✅ Subscribed to **%s** (%s)! Will autounsubscribe after 3 weeks of no gameplay.", username, region)}
 }
 
 func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) handlerResult {
@@ -551,36 +593,28 @@ func (b *Bot) handleUnsubscribe(i *discordgo.InteractionCreate) handlerResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	gameName, tagLine, err := riot.ParseRiotID(username)
+	err := b.Unsubscribe(ctx, channelID, username, region)
 	if err != nil {
-		return handlerResult{
-			Response: "❌ Invalid Riot ID format. Use `name#tag`",
-			Err:      newUserError(err),
+		// Check if it's a parse error
+		if _, _, parseErr := riot.ParseRiotID(username); parseErr != nil {
+			return handlerResult{
+				Response: "❌ Invalid Riot ID format. Use `name#tag`",
+				Err:      newUserError(err),
+			}
 		}
-	}
-
-	canonicalName := fmt.Sprintf("%s#%s", gameName, tagLine)
-
-	rowsAffected, err := b.repo.DeleteSubscription(ctx, db.DeleteSubscriptionParams{
-		DiscordChannelID: channelID,
-		LolUsername:      canonicalName,
-		Region:           region,
-	})
-	if err != nil {
+		if strings.Contains(err.Error(), "subscription not found") {
+			return handlerResult{
+				Response: fmt.Sprintf("⚠️ No subscription found for **%s** (%s)", username, region),
+				Err:      newUserError(err),
+			}
+		}
 		return handlerResult{
 			Response: "❌ Failed to unsubscribe. Please try again later.",
-			Err:      fmt.Errorf("delete subscription for %s in %s: %w", canonicalName, region, err),
-		}
-	}
-	if rowsAffected == 0 {
-		return handlerResult{
-			Response: fmt.Sprintf("⚠️ No subscription found for **%s** (%s)", canonicalName, region),
-			Err:      newUserError(fmt.Errorf("subscription not found: %s in %s", canonicalName, region)),
+			Err:      err,
 		}
 	}
 
-	b.log.InfoContext(ctx, "subscription deleted", "username", canonicalName, "region", region, "channel_id", channelID)
-	return handlerResult{Response: fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", canonicalName, region)}
+	return handlerResult{Response: fmt.Sprintf("✅ Unsubscribed from **%s** (%s)!", username, region)}
 }
 
 func (b *Bot) handleListForChannel(i *discordgo.InteractionCreate) handlerResult {

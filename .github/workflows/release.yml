@@ -9,7 +9,35 @@ permissions:
   contents: write
 
 jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip E2E by including [skip-e2e] in the tag's annotation message,
+    # or by setting the E2E_SKIP repository variable to "true"
+    if: ${{ vars.E2E_SKIP != 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: E2E test
+        run: make e2e
+        env:
+          DISCORD_TOKEN: ${{ secrets.E2E_DISCORD_TOKEN }}
+          RIOT_API_KEY: ${{ secrets.E2E_RIOT_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.E2E_LLM_PROVIDER }}
+          LLM_MODEL: ${{ secrets.E2E_LLM_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.E2E_ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.E2E_GOOGLE_API_KEY }}
+          E2E_DISCORD_CHANNEL_ID: ${{ secrets.E2E_DISCORD_CHANNEL_ID }}
+          E2E_DISCORD_GUILD_ID: ${{ secrets.E2E_DISCORD_GUILD_ID }}
+
   release:
+    needs: [e2e]
+    # Run even if e2e was skipped (but not if it failed)
+    if: ${{ !failure() }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

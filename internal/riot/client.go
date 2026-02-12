@@ -86,7 +86,7 @@ func newClient(apiKey string) *client {
 	return &client{
 		apiKey: apiKey,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		},
 	}
 }
@@ -196,12 +196,56 @@ type ChampionMastery struct {
 	ChampionPoints int64 `json:"championPoints"`
 }
 
+type LeagueList struct {
+	Entries []LeagueItem `json:"entries"`
+}
+
+type LeagueItem struct {
+	SummonerID string `json:"summonerId"`
+	Puuid      string `json:"puuid"`
+}
+
 type DirectClient struct {
 	c *client
 }
 
 func NewDirectClient(apiKey string) *DirectClient {
 	return &DirectClient{c: newClient(apiKey)}
+}
+
+func (d *DirectClient) GetChallengerLeague(region string) (LeagueList, error) {
+	baseURL, err := getPlatformURL(region)
+	if err != nil {
+		return LeagueList{}, err
+	}
+
+	endpoint := fmt.Sprintf("%s/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5", baseURL)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return LeagueList{}, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("X-Riot-Token", d.c.apiKey)
+
+	resp, err := d.c.httpClient.Do(req)
+	if err != nil {
+		return LeagueList{}, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return LeagueList{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var league LeagueList
+	if err := json.NewDecoder(resp.Body).Decode(&league); err != nil {
+		return LeagueList{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return league, nil
+}
+
+func (d *DirectClient) GetActiveGame(puuid, region string) (ActiveGame, error) {
+	return d.c.GetActiveGame(puuid, region)
 }
 
 func (d *DirectClient) GetAccountByRiotID(gameName, tagLine, region string) (Account, error) {

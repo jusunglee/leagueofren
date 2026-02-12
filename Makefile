@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy-site deploy-bot deploy-site-local
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy-site deploy-bot deploy-site-local e2e e2e-secrets
 
 # Default target
 help:
@@ -19,6 +19,8 @@ help:
 	@echo "  make build-windows  - Build Windows exe"
 	@echo "  make build-linux    - Build Linux binary"
 	@echo "  make build-darwin   - Build macOS binary"
+	@echo "  make e2e            - Run E2E test against live KR game"
+	@echo "  make e2e-secrets    - Upload E2E secrets from .env to GitHub Actions"
 	@echo "  make release v=X.Y.Z - Tag and push a release"
 	@echo "  make deploy-site    - Wait for CI, pull & restart site (web, worker, nginx)"
 	@echo "  make deploy-bot     - Wait for CI, pull & restart bot"
@@ -186,6 +188,33 @@ deploy-site-local:
 	docker compose -f docker-compose.prod.yml build web worker
 	docker compose -f docker-compose.prod.yml up -d web worker nginx
 	@echo "Site deployed. Use 'docker compose -f docker-compose.prod.yml logs -f web worker nginx' to follow logs."
+
+# Run E2E test (requires env vars or .env with E2E_DISCORD_CHANNEL_ID, E2E_DISCORD_GUILD_ID)
+e2e:
+	go run ./cmd/e2e
+
+# Upload E2E secrets from .env to GitHub Actions
+e2e-secrets:
+	@if [ ! -f .env ]; then echo "Error: .env not found"; exit 1; fi
+	@set -a && . ./.env && set +a && \
+	for pair in \
+		"E2E_DISCORD_TOKEN=$$DISCORD_TOKEN" \
+		"E2E_RIOT_API_KEY=$$RIOT_API_KEY" \
+		"E2E_LLM_PROVIDER=$$LLM_PROVIDER" \
+		"E2E_LLM_MODEL=$$LLM_MODEL" \
+		"E2E_ANTHROPIC_API_KEY=$$ANTHROPIC_API_KEY" \
+		"E2E_GOOGLE_API_KEY=$$GOOGLE_API_KEY" \
+		"E2E_DISCORD_CHANNEL_ID=$$E2E_DISCORD_CHANNEL_ID" \
+		"E2E_DISCORD_GUILD_ID=$$E2E_DISCORD_GUILD_ID"; \
+	do \
+		name=$${pair%%=*}; \
+		value=$${pair#*=}; \
+		if [ -z "$$value" ]; then \
+			echo "  skip $$name (not set)"; \
+		else \
+			echo "$$value" | gh secret set "$$name" && echo "  set  $$name"; \
+		fi; \
+	done
 
 # Clean build artifacts
 clean:
