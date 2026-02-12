@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronUp, ChevronDown, MessageCircleQuestion, ChevronDown as ChevronDownIcon, X, MessageSquarePlus, Send, SlidersHorizontal } from 'lucide-react'
 import { listTranslations, vote, submitFeedback, RateLimitError } from '../lib/api'
@@ -412,13 +413,13 @@ function SectionMarker({ label }: { label: string }) {
 
 // ── Pagination ──
 
-function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (fn: (p: number) => number) => void }) {
+function Pagination({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (page: number) => void }) {
   if (totalPages <= 1) return null
   return (
     <div className="flex items-center justify-center gap-4">
       <button
         disabled={page <= 1}
-        onClick={() => setPage(p => p - 1)}
+        onClick={() => onPageChange(page - 1)}
         className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         &larr; Prev
@@ -428,7 +429,7 @@ function Pagination({ page, totalPages, setPage }: { page: number; totalPages: n
       </span>
       <button
         disabled={page >= totalPages}
-        onClick={() => setPage(p => p + 1)}
+        onClick={() => onPageChange(page + 1)}
         className="pixel-font text-xs px-4 py-2 pixel-border bg-[var(--card)] pixel-shadow-sm disabled:opacity-40 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] transition-all duration-150 btn-press tracking-wide focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
       >
         Next &rarr;
@@ -441,13 +442,32 @@ function Pagination({ page, totalPages, setPage }: { page: number; totalPages: n
 
 export function Leaderboard() {
   const queryClient = useQueryClient()
-  const [sort, setSort] = useState<SortOption>('hot')
-  const [period, setPeriod] = useState<PeriodOption>('week')
-  const [region, setRegion] = useState('')
-  const [language, setLanguage] = useState('')
-  const [rank, setRank] = useState('')
-  const [champion, setChampion] = useState('')
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const sort = (searchParams.get('sort') as SortOption) || 'hot'
+  const period = (searchParams.get('period') as PeriodOption) || 'week'
+  const region = searchParams.get('region') || ''
+  const language = searchParams.get('language') || ''
+  const rank = searchParams.get('rank') || ''
+  const champion = searchParams.get('champion') || ''
+  const page = Number(searchParams.get('page')) || 1
+
+  const setParam = (updates: Record<string, string | number>) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      for (const [k, v] of Object.entries(updates)) {
+        const str = String(v)
+        const isDefault = (k === 'sort' && str === 'hot')
+          || (k === 'period' && str === 'week')
+          || (k === 'page' && str === '1')
+          || str === ''
+        if (isDefault) next.delete(k)
+        else next.set(k, str)
+      }
+      return next
+    }, { replace: true })
+  }
+
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [voteAnimations, setVoteAnimations] = useState<Record<number, 'up' | 'down' | 'shake'>>({})
 
@@ -546,7 +566,7 @@ export function Leaderboard() {
           return (
             <button
               key={opt.value}
-              onClick={() => { setSort(opt.value); setPage(1) }}
+              onClick={() => setParam({ sort: opt.value, page: 1 })}
               className={`pixel-font text-xs px-4 lg:px-5 py-2 pixel-border transition-all duration-150 btn-press inline-flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 ${
                 isActive
                   ? 'bg-[var(--violet)] text-white pixel-shadow-sm'
@@ -567,17 +587,17 @@ export function Leaderboard() {
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
               value={period}
-              onChange={v => { setPeriod(v as PeriodOption); setPage(1) }}
+              onChange={v => setParam({ period: v, page: 1 })}
               placeholder="Period"
             />
           )}
-          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
-          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
-          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
-          <PixelDropdown options={championOptions} value={champion} onChange={v => { setChampion(v); setPage(1) }} placeholder="All Champions" />
+          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => setParam({ region: v, page: 1 })} placeholder="All Regions" />
+          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => setParam({ language: v, page: 1 })} placeholder="All Languages" />
+          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => setParam({ rank: v, page: 1 })} placeholder="All Ranks" />
+          <PixelDropdown options={championOptions} value={champion} onChange={v => setParam({ champion: v, page: 1 })} placeholder="All Champions" />
           {hasFilters && (
             <button
-              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setChampion(''); setPage(1) }}
+              onClick={() => setParam({ region: '', language: '', rank: '', champion: '', page: 1 })}
               className="pixel-font text-[10px] px-3 py-2 bg-[var(--destructive)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[#b83a30] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-1"
             >
               <X size={12} strokeWidth={3} />
@@ -607,17 +627,17 @@ export function Leaderboard() {
             <PixelDropdown
               options={PERIOD_OPTIONS.map(p => ({ value: p.value, label: p.label }))}
               value={period}
-              onChange={v => { setPeriod(v as PeriodOption); setPage(1) }}
+              onChange={v => setParam({ period: v, page: 1 })}
               placeholder="Period"
             />
           )}
-          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => { setRegion(v); setPage(1) }} placeholder="All Regions" />
-          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => { setLanguage(v); setPage(1) }} placeholder="All Languages" />
-          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => { setRank(v); setPage(1) }} placeholder="All Ranks" />
-          <PixelDropdown options={championOptions} value={champion} onChange={v => { setChampion(v); setPage(1) }} placeholder="All Champions" />
+          <PixelDropdown options={REGION_OPTIONS} value={region} onChange={v => setParam({ region: v, page: 1 })} placeholder="All Regions" />
+          <PixelDropdown options={LANGUAGE_OPTIONS} value={language} onChange={v => setParam({ language: v, page: 1 })} placeholder="All Languages" />
+          <PixelDropdown options={RANK_OPTIONS} value={rank} onChange={v => setParam({ rank: v, page: 1 })} placeholder="All Ranks" />
+          <PixelDropdown options={championOptions} value={champion} onChange={v => setParam({ champion: v, page: 1 })} placeholder="All Champions" />
           {hasFilters && (
             <button
-              onClick={() => { setRegion(''); setLanguage(''); setRank(''); setChampion(''); setPage(1) }}
+              onClick={() => setParam({ region: '', language: '', rank: '', champion: '', page: 1 })}
               className="pixel-font text-[10px] px-3 py-2 bg-[var(--destructive)] text-white border-4 border-[var(--border)] rounded-[8px] pixel-shadow-sm tracking-wide uppercase hover:bg-[#b83a30] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all duration-150 btn-press inline-flex items-center gap-1"
             >
               <X size={12} strokeWidth={3} />
@@ -628,7 +648,7 @@ export function Leaderboard() {
       )}
 
       {/* Pagination — top */}
-      <Pagination page={page} totalPages={totalPages} setPage={setPage} />
+      <Pagination page={page} totalPages={totalPages} onPageChange={p => setParam({ page: p })} />
 
       {/* Translation Cards — scrollable container */}
       <div className="overflow-y-auto overflow-x-hidden max-h-[70vh] pixel-border bg-[var(--background-alt)] p-3 space-y-3">
