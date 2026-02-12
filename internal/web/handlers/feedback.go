@@ -57,6 +57,10 @@ func (h *FeedbackHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "text is required")
 		return
 	}
+	if len(req.Text) > 500 {
+		writeError(w, http.StatusBadRequest, "feedback text must be 500 characters or fewer")
+		return
+	}
 
 	ipHash := hashIP(middleware.ClientIP(r))
 
