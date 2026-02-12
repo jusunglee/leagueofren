@@ -13,18 +13,20 @@ import (
 )
 
 type Router struct {
-	repo        db.Repository
-	log         *slog.Logger
-	riot        *riot.DirectClient
-	riverClient *river.Client[pgx.Tx]
+	repo           db.Repository
+	log            *slog.Logger
+	riot           *riot.DirectClient
+	riverClient    *river.Client[pgx.Tx]
+	allowedOrigins []string
 }
 
-func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx]) *Router {
+func NewRouter(repo db.Repository, log *slog.Logger, riotClient *riot.DirectClient, riverClient *river.Client[pgx.Tx], allowedOrigins []string) *Router {
 	return &Router{
-		repo:        repo,
-		log:         log,
-		riot:        riotClient,
-		riverClient: riverClient,
+		repo:           repo,
+		log:            log,
+		riot:           riotClient,
+		riverClient:    riverClient,
+		allowedOrigins: allowedOrigins,
 	}
 }
 
@@ -82,5 +84,5 @@ func (r *Router) Handler() http.Handler {
 		),
 	)
 
-	return middleware.CORS(mux)
+	return middleware.CORS(r.allowedOrigins)(mux)
 }
