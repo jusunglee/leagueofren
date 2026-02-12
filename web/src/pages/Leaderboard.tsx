@@ -286,18 +286,18 @@ function TranslationCard({ t, index, onVote, onFeedback, voteAnimation }: {
         </button>
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="space-y-1">
           <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="pixel-font text-base lg:text-lg text-[var(--primary)] tracking-wide">{t.username}</span>
+            <span className="pixel-font text-base lg:text-lg text-[var(--primary)] tracking-wide break-all">{t.username}</span>
             {t.transliteration && (
               <>
                 <span className="text-[var(--border)] font-bold">&rarr;</span>
-                <span className="mono-font text-sm lg:text-base text-[var(--foreground-muted)] tracking-wide">{t.transliteration}</span>
+                <span className="mono-font text-sm lg:text-base text-[var(--foreground-muted)] tracking-wide break-all">{t.transliteration}</span>
               </>
             )}
           </div>
-          <div className="font-bold text-base lg:text-lg">{t.translation}</div>
+          <div className="font-bold text-base lg:text-lg break-words">{t.translation}</div>
         </div>
         {t.explanation && (
           <p className="text-sm text-[var(--foreground-muted)] mt-1 leading-relaxed">{t.explanation}</p>
