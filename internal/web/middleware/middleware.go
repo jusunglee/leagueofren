@@ -76,11 +76,13 @@ type IPRateLimiter struct {
 }
 
 func NewRateLimiter(max int, windowSeconds int) *IPRateLimiter {
-	return &IPRateLimiter{
+	rl := &IPRateLimiter{
 		requests: make(map[string][]time.Time),
 		max:      max,
 		window:   time.Duration(windowSeconds) * time.Second,
 	}
+	go rl.cleanupLoop()
+	return rl
 }
 
 func (rl *IPRateLimiter) Allow(ip string) bool {
@@ -105,6 +107,28 @@ func (rl *IPRateLimiter) Allow(ip string) bool {
 
 	rl.requests[ip] = append(pruned, now)
 	return true
+}
+
+func (rl *IPRateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		rl.mu.Lock()
+		cutoff := time.Now().Add(-rl.window)
+		for ip, timestamps := range rl.requests {
+			allExpired := true
+			for _, t := range timestamps {
+				if t.After(cutoff) {
+					allExpired = false
+					break
+				}
+			}
+			if allExpired {
+				delete(rl.requests, ip)
+			}
+		}
+		rl.mu.Unlock()
+	}
 }
 
 func RateLimit(limiter *IPRateLimiter) Middleware {
