@@ -22,7 +22,7 @@ fi
 
 # Clone or update repo
 INSTALL_DIR="/opt/leagueofren"
-BRANCH="feat/companion-website"
+BRANCH="main"
 if [ -d "$INSTALL_DIR" ]; then
     echo "✓ Repo exists at $INSTALL_DIR, pulling latest..."
     git -C "$INSTALL_DIR" fetch origin
