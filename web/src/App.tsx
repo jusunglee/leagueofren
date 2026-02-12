@@ -25,8 +25,10 @@ export default function App() {
                   <Swords size={20} strokeWidth={2.5} className="text-white" />
                 </div>
                 <div>
-                  <h1 className="pixel-font text-base lg:text-lg text-[var(--violet)] tracking-wide leading-tight">
-                    League of Ren
+                  <h1 className="text-base lg:text-lg text-[var(--violet)] leading-tight flex items-baseline gap-2 flex-wrap">
+                    <span className="pixel-font tracking-wide">League of Ren</span>
+                    <span className="pixel-font-zh text-xs lg:text-sm opacity-60">仁之联盟</span>
+                    <span className="pixel-font-kr text-xs lg:text-sm opacity-60">인의 리그</span>
                   </h1>
                   <p className="text-xs text-[var(--foreground-muted)] hidden sm:block">Translation Rankings</p>
                 </div>
