@@ -56,6 +56,7 @@ func mainE() error {
 		llmModel        = fs_.StringLong("llm-model", "", "LLM model name")
 		anthropicAPIKey = fs_.StringLong("anthropic-api-key", "", "Anthropic API key")
 		googleAPIKey    = fs_.StringLong("google-api-key", "", "Google API key")
+		allowedOrigins  = fs_.StringLong("allowed-origins", "", "Comma-separated list of allowed CORS origins")
 	)
 
 	if err := ff.Parse(fs_, os.Args[1:], ff.WithEnvVars()); err != nil {
@@ -154,7 +155,16 @@ func mainE() error {
 		return fmt.Errorf("starting river client: %w", err)
 	}
 
-	router := web.NewRouter(repo, log, riotClient, riverClient)
+	var origins []string
+	if *allowedOrigins != "" {
+		for _, o := range strings.Split(*allowedOrigins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+	}
+
+	router := web.NewRouter(repo, log, riotClient, riverClient, origins)
 	apiHandler := router.Handler()
 
 	// Serve API routes first, fall back to embedded static files for the SPA
