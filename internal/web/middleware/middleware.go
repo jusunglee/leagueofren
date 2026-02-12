@@ -181,13 +181,8 @@ func CacheControl(value string) Middleware {
 }
 
 func ClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.IndexByte(xff, ','); i > 0 {
-			return strings.TrimSpace(xff[:i])
-		}
-		return strings.TrimSpace(xff)
-	}
-
+	// Trust X-Real-IP set by the reverse proxy (nginx).
+	// X-Forwarded-For is not used as it can be spoofed by clients.
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return strings.TrimSpace(xri)
 	}
