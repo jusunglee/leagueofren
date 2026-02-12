@@ -91,6 +91,16 @@ func (b *Bot) Run(ctx context.Context, cancel context.CancelCauseFunc) error {
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
 		b.log.InfoContext(ctx, "connected to Discord", "username", r.User.Username, "discriminator", r.User.Discriminator)
 	})
+	b.session.AddHandler(func(s *discordgo.Session, g *discordgo.GuildDelete) {
+		delCtx, delCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer delCancel()
+		rows, err := b.repo.DeleteSubscriptionsByServer(delCtx, g.ID)
+		if err != nil {
+			b.log.ErrorContext(delCtx, "failed to delete subscriptions on guild removal", "guild_id", g.ID, "error", err)
+			return
+		}
+		b.log.InfoContext(delCtx, "deleted subscriptions for removed guild", "guild_id", g.ID, "deleted", rows)
+	})
 
 	if err := b.session.Open(); err != nil {
 		return fmt.Errorf("opening Discord connection: %w", err)
@@ -815,7 +825,7 @@ func (b *Bot) consumeTranslationMessages(ctx context.Context, job sendMessageJob
 
 func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob, error) {
 	b.log.InfoContext(ctx, "starting eval loop...")
-	subs, err := b.repo.GetAllSubscriptions(ctx, 1000)
+	subs, err := b.repo.GetAllSubscriptions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting all subscriptions %w", err)
 	}
@@ -826,6 +836,7 @@ func (b *Bot) produceTranslationMessages(ctx context.Context) ([]sendMessageJob,
 	})
 
 	var eg errgroup.Group
+	eg.SetLimit(20)
 	var mu sync.Mutex
 	var jobs []sendMessageJob
 

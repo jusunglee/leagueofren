@@ -291,12 +291,13 @@ type CacheGameStatusParams struct {
 type Repository interface {
 	// Subscriptions
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
-	GetAllSubscriptions(ctx context.Context, limit int32) ([]Subscription, error)
+	GetAllSubscriptions(ctx context.Context) ([]Subscription, error)
 	GetSubscriptionsByChannel(ctx context.Context, discordChannelID string) ([]Subscription, error)
 	GetSubscriptionByID(ctx context.Context, id int64) (Subscription, error)
 	CountSubscriptionsByServer(ctx context.Context, serverID string) (int64, error)
 	DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) (int64, error)
 	DeleteSubscriptions(ctx context.Context, ids []int64) (int64, error)
+	DeleteSubscriptionsByServer(ctx context.Context, serverID string) (int64, error)
 	UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int64) error
 
 	// Evals

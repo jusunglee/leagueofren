@@ -140,13 +140,12 @@ func (r *Repository) CreateSubscription(ctx context.Context, arg db.CreateSubscr
 	return r.GetSubscriptionByID(ctx, id)
 }
 
-func (r *Repository) GetAllSubscriptions(ctx context.Context, limit int32) ([]db.Subscription, error) {
+func (r *Repository) GetAllSubscriptions(ctx context.Context) ([]db.Subscription, error) {
 	rows, err := r.executor.QueryContext(ctx, `
 		SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at
 		FROM subscriptions
 		ORDER BY created_at DESC
-		LIMIT ?
-	`, limit)
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +212,16 @@ func (r *Repository) DeleteSubscriptions(ctx context.Context, ids []int64) (int6
 
 	query := fmt.Sprintf("DELETE FROM subscriptions WHERE id IN (%s)", strings.Join(placeholders, ","))
 	result, err := r.executor.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+func (r *Repository) DeleteSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
+	result, err := r.executor.ExecContext(ctx, `
+		DELETE FROM subscriptions WHERE server_id = ?
+	`, serverID)
 	if err != nil {
 		return 0, err
 	}

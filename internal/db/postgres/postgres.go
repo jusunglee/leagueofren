@@ -116,8 +116,8 @@ func (r *Repository) CreateSubscription(ctx context.Context, arg db.CreateSubscr
 	return convertSubscription(result), nil
 }
 
-func (r *Repository) GetAllSubscriptions(ctx context.Context, limit int32) ([]db.Subscription, error) {
-	results, err := r.queries.GetAllSubscriptions(ctx, limit)
+func (r *Repository) GetAllSubscriptions(ctx context.Context) ([]db.Subscription, error) {
+	results, err := r.queries.GetAllSubscriptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +157,10 @@ func (r *Repository) DeleteSubscription(ctx context.Context, arg db.DeleteSubscr
 
 func (r *Repository) DeleteSubscriptions(ctx context.Context, ids []int64) (int64, error) {
 	return r.queries.DeleteSubscriptions(ctx, ids)
+}
+
+func (r *Repository) DeleteSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
+	return r.queries.DeleteSubscriptionsByServer(ctx, serverID)
 }
 
 func (r *Repository) UpdateSubscriptionLastEvaluatedAt(ctx context.Context, id int64) error {

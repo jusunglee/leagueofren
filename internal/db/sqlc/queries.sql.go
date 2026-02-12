@@ -385,6 +385,19 @@ func (q *Queries) DeleteSubscriptions(ctx context.Context, dollar_1 []int64) (in
 	return result.RowsAffected(), nil
 }
 
+const deleteSubscriptionsByServer = `-- name: DeleteSubscriptionsByServer :execrows
+DELETE FROM subscriptions
+WHERE server_id = $1
+`
+
+func (q *Queries) DeleteSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSubscriptionsByServer, serverID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteVote = `-- name: DeleteVote :execrows
 DELETE FROM votes WHERE translation_id = $1 AND visitor_id = $2
 `
@@ -438,11 +451,10 @@ func (q *Queries) FindSubscriptionsWithExpiredNewestOnlineEval(ctx context.Conte
 const getAllSubscriptions = `-- name: GetAllSubscriptions :many
 SELECT id, discord_channel_id, server_id, lol_username, region, created_at, last_evaluated_at FROM subscriptions
 ORDER BY created_at DESC
-LIMIT $1
 `
 
-func (q *Queries) GetAllSubscriptions(ctx context.Context, limit int32) ([]Subscription, error) {
-	rows, err := q.db.Query(ctx, getAllSubscriptions, limit)
+func (q *Queries) GetAllSubscriptions(ctx context.Context) ([]Subscription, error) {
+	rows, err := q.db.Query(ctx, getAllSubscriptions)
 	if err != nil {
 		return nil, err
 	}

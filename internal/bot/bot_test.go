@@ -101,8 +101,8 @@ func (m *MockRepository) CreateSubscription(ctx context.Context, arg db.CreateSu
 	return ret.Get(0).(db.Subscription), ret.Error(1)
 }
 
-func (m *MockRepository) GetAllSubscriptions(ctx context.Context, limit int32) ([]db.Subscription, error) {
-	ret := m.Called(ctx, limit)
+func (m *MockRepository) GetAllSubscriptions(ctx context.Context) ([]db.Subscription, error) {
+	ret := m.Called(ctx)
 	return ret.Get(0).([]db.Subscription), ret.Error(1)
 }
 
@@ -128,6 +128,11 @@ func (m *MockRepository) DeleteSubscription(ctx context.Context, arg db.DeleteSu
 
 func (m *MockRepository) DeleteSubscriptions(ctx context.Context, ids []int64) (int64, error) {
 	ret := m.Called(ctx, ids)
+	return ret.Get(0).(int64), ret.Error(1)
+}
+
+func (m *MockRepository) DeleteSubscriptionsByServer(ctx context.Context, serverID string) (int64, error) {
+	ret := m.Called(ctx, serverID)
 	return ret.Get(0).(int64), ret.Error(1)
 }
 

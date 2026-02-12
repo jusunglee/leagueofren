@@ -47,7 +47,7 @@ func TestSubscriptionCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), count)
 
-	all, err := repo.GetAllSubscriptions(ctx, 100)
+	all, err := repo.GetAllSubscriptions(ctx)
 	require.NoError(t, err)
 	assert.Len(t, all, 1)
 
@@ -81,7 +81,7 @@ func TestDeleteSubscription(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
 
-	all, err := repo.GetAllSubscriptions(ctx, 100)
+	all, err := repo.GetAllSubscriptions(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, all)
 }

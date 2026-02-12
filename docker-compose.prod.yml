@@ -79,6 +79,7 @@ services:
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       GRAFANA_HOST: grafana
       WEBSITE_URL: https://submit.leagueofren.com
+      MAX_SUBSCRIPTIONS_PER_SERVER: "1"
 
   dozzle:
     image: amir20/dozzle:latest

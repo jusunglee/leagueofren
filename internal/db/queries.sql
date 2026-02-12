@@ -6,8 +6,7 @@ RETURNING *;
 
 -- name: GetAllSubscriptions :many
 SELECT * FROM subscriptions
-ORDER BY created_at DESC
-LIMIT $1;
+ORDER BY created_at DESC;
 
 -- name: GetEvalByGameAndSubscription :one
 SELECT * FROM evals
@@ -46,6 +45,10 @@ WHERE discord_channel_id = $1 AND lol_username = $2 AND region = $3;
 -- name: DeleteSubscriptions :execrows
 DELETE FROM subscriptions
 WHERE id=ANY($1::bigint[]);
+
+-- name: DeleteSubscriptionsByServer :execrows
+DELETE FROM subscriptions
+WHERE server_id = $1;
 
 -- name: UpdateSubscriptionLastEvaluatedAt :exec
 UPDATE subscriptions
