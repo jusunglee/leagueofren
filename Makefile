@@ -1,4 +1,4 @@
-.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy-site deploy-bot deploy-site-local e2e e2e-secrets
+.PHONY: help setup db-up db-down db-logs schema-apply schema-diff schema-inspect sqlc run watch build build-all build-windows build-linux build-darwin clean translate-test release deploy-site _deploy-site deploy-bot _deploy-bot deploy-site-local e2e e2e-secrets
 
 # Default target
 help:
@@ -168,14 +168,24 @@ define wait-ci
 endef
 
 # Deploy site (web, worker, nginx) by pulling pre-built images from GHCR
+# Uses flock so concurrent deploys queue up instead of racing on git pull
 deploy-site:
+	@flock /tmp/deploy-site.lock $(MAKE) _deploy-site
+
+_deploy-site:
+	git pull
 	$(call wait-ci)
 	docker compose -f docker-compose.prod.yml pull web worker nginx
 	docker compose -f docker-compose.prod.yml up -d web worker nginx
 	@echo "Site deployed. Use 'docker compose -f docker-compose.prod.yml logs -f web worker nginx' to follow logs."
 
 # Deploy bot by pulling pre-built image from GHCR
+# Uses flock so concurrent deploys queue up instead of racing on git pull
 deploy-bot:
+	@flock /tmp/deploy-bot.lock $(MAKE) _deploy-bot
+
+_deploy-bot:
+	git pull
 	$(call wait-ci)
 	docker compose -f docker-compose.prod.yml pull bot
 	docker compose -f docker-compose.prod.yml up -d bot
