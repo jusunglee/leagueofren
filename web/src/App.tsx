@@ -28,7 +28,7 @@ export default function App() {
                   <h1 className="text-base lg:text-lg text-[var(--violet)] leading-tight flex items-center gap-2 flex-wrap">
                     <span className="pixel-font tracking-wide">League of Ren</span>
                     <span className="pixel-font-zh text-xs lg:text-sm font-bold opacity-60">仁之联盟</span>
-                    <span className="pixel-font-kr text-xs lg:text-sm font-bold opacity-60">인의 리그</span>
+                    <span className="pixel-font-kr text-xs lg:text-sm font-bold opacity-60 translate-y-[2px]">인의 리그</span>
                   </h1>
                   <p className="text-xs text-[var(--foreground-muted)] hidden sm:block">Translation Rankings</p>
                 </div>
