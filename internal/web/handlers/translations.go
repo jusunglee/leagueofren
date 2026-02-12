@@ -262,6 +262,7 @@ type createTranslationRequest struct {
 }
 
 func (h *TranslationHandler) Create(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10*1024) // 10KB
 	var req createTranslationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
