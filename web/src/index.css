@@ -50,6 +50,13 @@ body {
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Galmuri11";
+  src: url("/fonts/Galmuri11-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 .pixel-font-zh {
   font-family: "DotGothic16", monospace;
   -webkit-font-smoothing: none;
