@@ -43,6 +43,7 @@ groups:
                     params:
                       - 0
               refId: C
+        noDataState: OK
         for: 1m
         labels:
           severity: critical
@@ -90,6 +91,7 @@ groups:
                     params:
                       - 5
               refId: C
+        noDataState: OK
         for: 5m
         labels:
           severity: critical
@@ -138,6 +140,7 @@ groups:
                     params:
                       - 0
               refId: C
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
@@ -324,6 +327,7 @@ groups:
                     params:
                       - 0
               refId: C
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
