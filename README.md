@@ -8,6 +8,8 @@
 
 A Discord bot that translates Korean and Chinese summoner names in League of Legends games for subscribed users.
 
+View submitted translations here: https://leagueofren.com
+
 <figure>
   <table>
     <tr>
